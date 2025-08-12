@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.env
+.venv/
+venv/
+.Python
+.pytest_cache/
+
+# --- Node / Next.js (frontend) ---
+frontend/node_modules/
+frontend/.next/
+frontend/next-dev/
+frontend/.turbo/
+frontend/.env.local
+frontend/.env*
+
+# --- OS / Editors ---
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Build outputs ---
+dist/
+build/
+
+# --- Large or generated data (toggle as needed) ---
+# Exclude large datasets by default to keep repo light. Remove if you want to track data.
+data/

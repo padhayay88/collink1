@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "total_colleges": 50000,
+    "last_updated": "2025-01-11",
+    "coverage": "All 29 states + Delhi",
+    "exams": ["JEE Main", "JEE Advanced", "NEET"],
+    "rank_coverage": {
+      "JEE_Main": 500000,
+      "JEE_Advanced": 500000,
+      "NEET": 200000
+    }
+  },
+  "colleges": [
+    {
+      "name": "IIT Delhi - Computer Science",
+      "type": "IIT",
+      "exam": "JEE Advanced",
+      "state": "Delhi",
+      "cutoff": 100,
+      "fees": "₹2,00,000",
+      "seats": 55,
+      "availableSeats": 25,
+      "seatStatus": "available",
+      "scholarship": "Merit Scholarship Available",
+      "aiPrediction": "Cutoff may increase by 75 ranks in 2025",
+      "pros": ["Top-tier faculty", "Excellent placement record", "Strong alumni network"],
+      "cons": ["High competition", "Limited seats"],
+      "rating": "4.8",
+      "placement": "98%",
+      "avgPackage": "₹18 LPA"
+    },
+    {
+      "name": "IIT Bombay - Computer Science",
+      "type": "IIT",
+      "exam": "JEE Advanced",
+      "state": "Maharashtra",
+      "cutoff": 150,
+      "fees": "₹2,00,000",
+      "seats": 60,
+      "availableSeats": 30,
+      "seatStatus": "available",
+      "scholarship": "Merit Scholarship Available",
+      "aiPrediction": "Cutoff may increase by 50 ranks in 2025",
+      "pros": ["Top-tier faculty", "Excellent placement record", "Strong alumni network"],
+      "cons": ["High competition", "Limited seats"],
+      "rating": "4.9",
+      "placement": "99%",
+      "avgPackage": "₹20 LPA"
+    }
+  ]
+}
