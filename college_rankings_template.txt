@@ -1,0 +1,18 @@
+# College Rankings Template
+# Copy the college rankings from your PDF and paste them here
+# Format should be: Rank. College Name
+# Examples:
+
+1. Indian Institute of Technology, Delhi
+2. Indian Institute of Technology, Bombay
+3. Indian Institute of Science, Bangalore
+4. Indian Institute of Technology, Kanpur
+5. Indian Institute of Technology, Kharagpur
+6. Indian Institute of Technology, Madras
+7. Indian Institute of Technology, Roorkee
+8. Indian Institute of Technology, Guwahati
+9. Jawaharlal Nehru University, New Delhi
+10. University of Delhi, Delhi
+
+# Continue adding all colleges from your PDF...
+# The script will automatically process this data and integrate it into your project

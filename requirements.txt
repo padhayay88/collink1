@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+requests
+aiofiles
+torch==2.8.0+cpu ; platform_system=="Windows" --index-url https://download.pytorch.org/whl/cpu
+beautifulsoup4
+pandas
+PyMuPDF>=1.24.0
