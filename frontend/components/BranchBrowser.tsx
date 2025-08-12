@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { Layers, ChevronDown, ChevronUp, Search, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 
 interface BranchBrowserProps {
@@ -16,6 +16,11 @@ export default function BranchBrowser({ rank, exam }: BranchBrowserProps) {
   const [selected, setSelected] = useState<string>('')
   const [results, setResults] = useState<Array<{ college: string; branch: string; opening_rank?: number; closing_rank?: number; location?: string }>>([])
   const [loadingResults, setLoadingResults] = useState(false)
+  const [displayLimit, setDisplayLimit] = useState(20)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadingRef = useRef<HTMLDivElement>(null)
   const isJEE = useMemo(() => (exam || '').toLowerCase() === 'jee', [exam])
 
   const filteredBranches = useMemo(() => {
@@ -23,6 +28,49 @@ export default function BranchBrowser({ rank, exam }: BranchBrowserProps) {
     if (!q) return branches
     return branches.filter(b => b.toLowerCase().includes(q))
   }, [branches, query])
+
+  const displayedResults = results.slice(0, displayLimit)
+
+  // Infinite scroll callback
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return
+    
+    setIsLoadingMore(true)
+    setTimeout(() => {
+      setDisplayLimit(prev => {
+        const newLimit = prev + 20
+        if (newLimit >= results.length) {
+          setHasMore(false)
+        }
+        return newLimit
+      })
+      setIsLoadingMore(false)
+    }, 300)
+  }, [isLoadingMore, hasMore, results.length])
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current)
+    }
+
+    observerRef.current = observer
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [loadMore, hasMore, isLoadingMore])
 
   const loadBranches = async () => {
     if (!isJEE || branches.length > 0) return
@@ -77,8 +125,10 @@ export default function BranchBrowser({ rank, exam }: BranchBrowserProps) {
 
   const loadResults = async (branch: string) => {
     setLoadingResults(true)
+    setDisplayLimit(20)
+    setHasMore(true)
     try {
-      const data = await api.getCollegesByBranch({ branch, rank, limit: 100 })
+      const data = await api.getCollegesByBranch({ branch, rank, limit: 200 })
       setResults(data.colleges)
     } catch (e) {
       setResults([])
@@ -139,12 +189,17 @@ export default function BranchBrowser({ rank, exam }: BranchBrowserProps) {
           {/* Results */}
           {selected && (
             <div className="mt-5">
-              <div className="text-sm text-gray-700 mb-2">Colleges for <span className="font-semibold">{selected}</span> near rank <span className="font-semibold">{rank.toLocaleString()}</span></div>
+              <div className="text-sm text-gray-700 mb-2">
+                Colleges for <span className="font-semibold">{selected}</span> near rank <span className="font-semibold">{rank.toLocaleString()}</span>
+                {results.length > 0 && (
+                  <span className="text-gray-500 ml-2">({displayedResults.length} of {results.length} shown)</span>
+                )}
+              </div>
               {loadingResults ? (
                 <div className="text-sm text-gray-500">Loading colleges…</div>
               ) : (
                 <div className="space-y-2">
-                  {results.map((r, idx) => (
+                  {displayedResults.map((r, idx) => (
                     <div key={idx} className="p-3 rounded-lg border border-gray-200 bg-white flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{r.college}</div>
@@ -156,6 +211,32 @@ export default function BranchBrowser({ rank, exam }: BranchBrowserProps) {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Infinite Scroll Loading Indicator */}
+                  {hasMore && results.length > 0 && (
+                    <div ref={loadingRef} className="flex justify-center py-4">
+                      <div className="flex items-center space-x-2 text-gray-600">
+                        {isLoadingMore ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Loading more colleges...</span>
+                          </>
+                        ) : (
+                          <span className="text-sm">Scroll down to load more colleges</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* End of Results */}
+                  {!hasMore && results.length > 0 && (
+                    <div className="text-center py-4">
+                      <div className="text-sm text-gray-500">
+                        You've seen all {results.length} colleges for {selected}
+                      </div>
+                    </div>
+                  )}
+
                   {results.length === 0 && (
                     <div className="text-sm text-gray-500">No colleges found.</div>
                   )}

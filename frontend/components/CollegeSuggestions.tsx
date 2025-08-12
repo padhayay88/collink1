@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle, AlertTriangle, XCircle, MapPin, TrendingUp, ExternalLink, GraduationCap, BarChart2, Save, Bell, Heart, Share2, Copy, Eye, Globe, BookOpen, UserCheck, FileText, ChevronDown, ChevronUp, Info, Star, Bookmark, Award, Home, Building2, Phone, MessageCircle, IndianRupee, Gift } from 'lucide-react'
+import { CheckCircle, AlertTriangle, XCircle, MapPin, TrendingUp, ExternalLink, GraduationCap, BarChart2, Save, Bell, Heart, Share2, Copy, Eye, Globe, BookOpen, UserCheck, FileText, ChevronDown, ChevronUp, Info, Star, Bookmark, Award, Home, Building2, Phone, MessageCircle, IndianRupee, Gift, Loader2 } from 'lucide-react'
 import TrendChart from './TrendChart'
 import api, { Prediction } from '../lib/api'
 
@@ -14,6 +14,12 @@ interface CollegeSuggestionsProps {
 }
 
 export default function CollegeSuggestions({ predictions, exam, rank, category }: CollegeSuggestionsProps) {
+  const [displayLimit, setDisplayLimit] = useState(20) // Start with fewer items
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadingRef = useRef<HTMLDivElement>(null)
+
   const getConfidenceColor = (confidence?: string, level?: string) => {
     const val = (confidence || level || '').toLowerCase()
     switch (val) {
@@ -62,11 +68,59 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
   const mediumConfidenceColleges = predictions.filter(p => (p.confidence || p.confidence_level || '').toLowerCase() === 'medium')
   const lowConfidenceColleges = predictions.filter(p => (p.confidence || p.confidence_level || '').toLowerCase() === 'low')
   
-  // Performance: Limit initial display
-  const [displayLimit, setDisplayLimit] = useState(50)
+  // Performance: Limit initial display with infinite scroll
   const displayedHigh = highConfidenceColleges.slice(0, displayLimit)
   const displayedMedium = mediumConfidenceColleges.slice(0, displayLimit)
   const displayedLow = lowConfidenceColleges.slice(0, displayLimit)
+
+  // Infinite scroll callback
+  const loadMore = useCallback(() => {
+    if (isLoading || !hasMore) return
+    
+    setIsLoading(true)
+    setTimeout(() => {
+      setDisplayLimit(prev => {
+        const newLimit = prev + 20
+        const totalColleges = highConfidenceColleges.length + mediumConfidenceColleges.length + lowConfidenceColleges.length
+        if (newLimit >= totalColleges) {
+          setHasMore(false)
+        }
+        return newLimit
+      })
+      setIsLoading(false)
+    }, 500) // Simulate loading delay
+  }, [isLoading, hasMore, highConfidenceColleges.length, mediumConfidenceColleges.length, lowConfidenceColleges.length])
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current)
+    }
+
+    observerRef.current = observer
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [loadMore, hasMore, isLoading])
+
+  // Reset display limit when predictions change
+  useEffect(() => {
+    setDisplayLimit(20)
+    setHasMore(true)
+    setIsLoading(false)
+  }, [predictions])
 
   if (predictions.length === 0) {
     return (
@@ -148,26 +202,14 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
           </div>
           <div className="grid gap-6">
             {displayedHigh.map((prediction, index) => (
-              <CollegeCard key={index} prediction={prediction} exam={exam} />
+              <CollegeCard key={`high-${index}`} prediction={prediction} exam={exam} />
             ))}
           </div>
-          
-          {/* Load More Button */}
-          {highConfidenceColleges.length > displayLimit && (
-            <div className="flex justify-center mt-6">
-              <button
-                onClick={() => setDisplayLimit(prev => prev + 50)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Load More ({highConfidenceColleges.length - displayLimit} remaining)
-              </button>
-            </div>
-          )}
         </motion.div>
       )}
 
       {/* Medium Confidence Colleges */}
-      {mediumConfidenceColleges.length > 0 && (
+      {displayedMedium.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -177,19 +219,19 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             <div className="w-3 h-8 bg-yellow-500 rounded-full mr-3"></div>
             <h3 className="text-2xl font-bold text-gray-900">Medium Confidence Matches</h3>
             <div className="ml-3 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-              {mediumConfidenceColleges.length} colleges
+              {displayedMedium.length} of {mediumConfidenceColleges.length} colleges
             </div>
           </div>
           <div className="grid gap-6">
-            {mediumConfidenceColleges.map((prediction, index) => (
-              <CollegeCard key={index} prediction={prediction} exam={exam} />
+            {displayedMedium.map((prediction, index) => (
+              <CollegeCard key={`medium-${index}`} prediction={prediction} exam={exam} />
             ))}
           </div>
         </motion.div>
       )}
 
       {/* Low Confidence Colleges */}
-      {lowConfidenceColleges.length > 0 && (
+      {displayedLow.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -199,13 +241,44 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             <div className="w-3 h-8 bg-red-500 rounded-full mr-3"></div>
             <h3 className="text-2xl font-bold text-gray-900">Reach Colleges</h3>
             <div className="ml-3 bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-              {lowConfidenceColleges.length} colleges
+              {displayedLow.length} of {lowConfidenceColleges.length} colleges
             </div>
           </div>
           <div className="grid gap-6">
-            {lowConfidenceColleges.map((prediction, index) => (
-              <CollegeCard key={index} prediction={prediction} exam={exam} />
+            {displayedLow.map((prediction, index) => (
+              <CollegeCard key={`low-${index}`} prediction={prediction} exam={exam} />
             ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Infinite Scroll Loading Indicator */}
+      {hasMore && (
+        <div ref={loadingRef} className="flex justify-center py-8">
+          <div className="flex items-center space-x-2 text-gray-600">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Loading more colleges...</span>
+              </>
+            ) : (
+              <span>Scroll down to load more colleges</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* End of Results */}
+      {!hasMore && predictions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-8"
+        >
+          <div className="bg-gray-50 rounded-lg p-6">
+            <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+            <p className="text-gray-600">You've seen all {predictions.length} college predictions</p>
+            <p className="text-sm text-gray-500 mt-1">Use the filters above to refine your search</p>
           </div>
         </motion.div>
       )}

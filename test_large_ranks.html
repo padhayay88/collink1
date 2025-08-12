@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Large Ranks - College Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-input {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            align-items: center;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .college-card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .college-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .college-details {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Large Ranks - College Predictor</h1>
+        <p>This page tests the comprehensive college database with large ranks up to 200,000.</p>
+        
+        <div class="test-section">
+            <h2>📊 Database Status</h2>
+            <div id="db-status" class="status info">Loading database...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Test Rank Predictions</h2>
+            <div class="test-input">
+                <label>Rank:</label>
+                <input type="number" id="test-rank" placeholder="Enter rank (1-200000)" value="50000">
+                <label>Exam:</label>
+                <select id="test-exam">
+                    <option value="JEE Main">JEE Main</option>
+                    <option value="JEE Advanced">JEE Advanced</option>
+                    <option value="NEET">NEET</option>
+                </select>
+                <button onclick="testRank()">Test Rank</button>
+            </div>
+            <div id="test-results" class="results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🔍 Large Rank Tests</h2>
+            <p>Testing predefined large ranks to ensure they work correctly:</p>
+            <div class="test-input">
+                <button onclick="testLargeRanks()">Test Large Ranks (50K, 100K, 150K)</button>
+            </div>
+            <div id="large-rank-results" class="results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📈 Database Statistics</h2>
+            <div id="db-stats" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let collegeDatabase = [];
+        
+        // Load comprehensive database
+        async function loadDatabase() {
+            try {
+                const response = await fetch('comprehensive_college_database.json');
+                const data = await response.json();
+                collegeDatabase = data.colleges || [];
+                
+                document.getElementById('db-status').innerHTML = `
+                    ✅ Database loaded successfully!<br>
+                    📊 Total colleges: ${collegeDatabase.length.toLocaleString()}<br>
+                    📅 Last updated: ${data.metadata.last_updated}<br>
+                    🎯 Coverage: ${data.metadata.coverage}
+                `;
+                document.getElementById('db-status').className = 'status success';
+                
+                // Show database statistics
+                showDatabaseStats();
+                
+            } catch (error) {
+                document.getElementById('db-status').innerHTML = `❌ Error loading database: ${error.message}`;
+                document.getElementById('db-status').className = 'status error';
+            }
+        }
+        
+        function showDatabaseStats() {
+            const stats = {
+                total: collegeDatabase.length,
+                byExam: {},
+                byType: {},
+                byState: {},
+                cutoffRange: {
+                    min: Math.min(...collegeDatabase.map(c => c.cutoff)),
+                    max: Math.max(...collegeDatabase.map(c => c.cutoff))
+                }
+            };
+            
+            // Count by exam
+            collegeDatabase.forEach(college => {
+                stats.byExam[college.exam] = (stats.byExam[college.exam] || 0) + 1;
+                stats.byType[college.type] = (stats.byType[college.type] || 0) + 1;
+                stats.byState[college.state] = (stats.byState[college.state] || 0) + 1;
+            });
+            
+            let statsHTML = `
+                <h3>📊 Database Statistics</h3>
+                <p><strong>Total Colleges:</strong> ${stats.total.toLocaleString()}</p>
+                <p><strong>Cutoff Range:</strong> ${stats.cutoffRange.min.toLocaleString()} - ${stats.cutoffRange.max.toLocaleString()}</p>
+                
+                <h4>By Exam:</h4>
+                <ul>
+                    ${Object.entries(stats.byExam).map(([exam, count]) => 
+                        `<li>${exam}: ${count.toLocaleString()} colleges</li>`
+                    ).join('')}
+                </ul>
+                
+                <h4>By Type:</h4>
+                <ul>
+                    ${Object.entries(stats.byType).map(([type, count]) => 
+                        `<li>${type}: ${count.toLocaleString()} colleges</li>`
+                    ).join('')}
+                </ul>
+                
+                <h4>Top 5 States:</h4>
+                <ul>
+                    ${Object.entries(stats.byState)
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 5)
+                        .map(([state, count]) => 
+                            `<li>${state}: ${count.toLocaleString()} colleges</li>`
+                        ).join('')}
+                </ul>
+            `;
+            
+            document.getElementById('db-stats').innerHTML = statsHTML;
+        }
+        
+        function testRank() {
+            const rank = parseInt(document.getElementById('test-rank').value);
+            const exam = document.getElementById('test-exam').value;
+            
+            if (!rank || rank <= 0) {
+                document.getElementById('test-results').innerHTML = '<div class="status error">Please enter a valid rank greater than 0</div>';
+                return;
+            }
+            
+            // Filter colleges
+            const matchingColleges = collegeDatabase.filter(college => 
+                college.exam === exam && college.cutoff >= rank
+            );
+            
+            // Sort by cutoff rank
+            matchingColleges.sort((a, b) => a.cutoff - b.cutoff);
+            
+            let resultsHTML = `
+                <h3>🎯 Results for Rank ${rank.toLocaleString()} - ${exam}</h3>
+                <p><strong>Found:</strong> ${matchingColleges.length.toLocaleString()} colleges</p>
+            `;
+            
+            if (matchingColleges.length > 0) {
+                resultsHTML += `
+                    <p><strong>Best college:</strong> ${matchingColleges[0].name} (Cutoff: ${matchingColleges[0].cutoff.toLocaleString()})</p>
+                    <p><strong>Worst college:</strong> ${matchingColleges[matchingColleges.length-1].name} (Cutoff: ${matchingColleges[matchingColleges.length-1].cutoff.toLocaleString()})</p>
+                    
+                    <h4>Top 10 Colleges:</h4>
+                `;
+                
+                // Show top 10 colleges
+                matchingColleges.slice(0, 10).forEach(college => {
+                    resultsHTML += `
+                        <div class="college-card">
+                            <div class="college-name">${college.name}</div>
+                            <div class="college-details">
+                                <strong>Type:</strong> ${college.type} | 
+                                <strong>State:</strong> ${college.state} | 
+                                <strong>Cutoff:</strong> ${college.cutoff.toLocaleString()} | 
+                                <strong>Fees:</strong> ${college.fees} | 
+                                <strong>Rating:</strong> ${college.rating}/5.0
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (matchingColleges.length > 10) {
+                    resultsHTML += `<p><em>... and ${(matchingColleges.length - 10).toLocaleString()} more colleges</em></p>`;
+                }
+            } else {
+                resultsHTML += '<div class="status error">No colleges found for this rank and exam combination</div>';
+            }
+            
+            document.getElementById('test-results').innerHTML = resultsHTML;
+        }
+        
+        function testLargeRanks() {
+            const largeRanks = [50000, 100000, 150000];
+            const exams = ['JEE Main', 'JEE Advanced', 'NEET'];
+            
+            let resultsHTML = '<h3>🔍 Large Rank Test Results</h3>';
+            
+            largeRanks.forEach(rank => {
+                resultsHTML += `<h4>Rank ${rank.toLocaleString()}:</h4>`;
+                
+                exams.forEach(exam => {
+                    const matchingColleges = collegeDatabase.filter(college => 
+                        college.exam === exam && college.cutoff >= rank
+                    );
+                    
+                    resultsHTML += `
+                        <p><strong>${exam}:</strong> ${matchingColleges.length.toLocaleString()} colleges found</p>
+                    `;
+                });
+                
+                resultsHTML += '<hr>';
+            });
+            
+            document.getElementById('large-rank-results').innerHTML = resultsHTML;
+        }
+        
+        // Load database on page load
+        window.onload = loadDatabase;
+    </script>
+</body>
+</html>

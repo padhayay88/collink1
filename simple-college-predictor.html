@@ -144,6 +144,79 @@
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
         
+        /* Infinite scrolling animations */
+        .college-card {
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .loading-spinner {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            color: #6b7280;
+        }
+        
+        .loading-spinner::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #loading-indicator {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid #e5e7eb;
+        }
+        
+        #end-message {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        /* Smooth scrolling for better UX */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Progress indicator for infinite scroll */
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 3px;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            z-index: 1000;
+            transition: width 0.3s ease;
+        }
+        
         .college-name {
             font-size: 1.1rem;
             font-weight: 700;
@@ -287,8 +360,9 @@
         }
     </style>
 </head>
-<body>
-    <div class="container">
+    <body>
+        <div class="scroll-progress" id="scroll-progress"></div>
+        <div class="container">
         <div class="header">
             <h1>🎓 Collink College Predictor</h1>
             <p>Advanced AI-Powered College Predictor with Careers360 Features</p>
@@ -869,8 +943,28 @@
             return colleges;
         }
 
-        // Generate the massive database
-        const collegeDatabase = generateMassiveDatabase();
+        // Load comprehensive college database
+        let collegeDatabase = [];
+        
+        // Load from comprehensive database
+        fetch('comprehensive_college_database.json')
+            .then(response => response.json())
+            .then(data => {
+                collegeDatabase = data.colleges || [];
+                console.log(`Loaded ${collegeDatabase.length} colleges from comprehensive database`);
+                console.log('Database coverage:', data.metadata);
+                
+                // Auto-predict on successful load
+                setTimeout(() => {
+                    predictColleges();
+                }, 100);
+            })
+            .catch(error => {
+                console.log('Error loading comprehensive database:', error);
+                // Fallback to generated data
+                collegeDatabase = generateMassiveDatabase();
+                console.log(`Loaded ${collegeDatabase.length} colleges from generated database`);
+            });
         
         // Gamification variables
         let userProgress = 0;
@@ -1007,14 +1101,13 @@
             const type = document.getElementById('type').value;
             const search = document.getElementById('search').value.toLowerCase();
             
-            // Validate rank limits based on exam type (both JEE and NEET up to 2,00,000)
-            const maxRank = 200000;
-            if (rank > maxRank) {
+            // Remove rank limit validation - allow any rank input
+            // The system will show colleges with cutoff ranks >= user rank
+            if (rank <= 0) {
                 document.getElementById('results-container').innerHTML = `
                     <div class="no-results">
-                        <h3>⚠️ Rank Limit Exceeded</h3>
-                        <p>Maximum rank for ${exam} is ${maxRank.toLocaleString()}</p>
-                        <p>Please enter a rank between 1 and ${maxRank.toLocaleString()}</p>
+                        <h3>⚠️ Invalid Rank</h3>
+                        <p>Please enter a valid rank greater than 0</p>
                     </div>
                 `;
                 return;
@@ -1055,57 +1148,154 @@
                 return;
             }
             
+            // Store colleges for infinite scrolling
+            currentColleges = colleges;
+            displayedCount = 0;
+            
             const titleText = rank ? 
                 `🎯 ${mode} Results: ${colleges.length} colleges found for rank ${rank.toLocaleString()}` :
                 `🎯 ${mode} Results: ${colleges.length} colleges found`;
             
+            // Create initial display with infinite scrolling
             const resultsHTML = `
                 <h2>${titleText}</h2>
-                <div class="college-grid">
-                    ${colleges.slice(0, 50).map(college => {
-                        const seatStatusClass = college.seatStatus === 'available' ? 'seats-available' : 
-                                              college.seatStatus === 'limited' ? 'seats-limited' : 'seats-full';
-                        const seatStatusText = college.seatStatus === 'available' ? `${college.availableSeats} Available` : 
-                                             college.seatStatus === 'limited' ? `${college.availableSeats} Left` : 'Full';
-                        
-                        return `
-                        <div class="college-card">
-                            <div class="college-name">${college.name}</div>
-                            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
-                                <div class="college-type type-${college.type.toLowerCase()}">${college.type}</div>
-                                <div class="seat-status ${seatStatusClass}">🪑 ${seatStatusText}</div>
-                                ${college.scholarship ? `<div class="scholarship-badge">💰 ${college.scholarship}</div>` : ''}
-                            </div>
-                            <div class="college-details">
-                                <div class="detail-item">📍 <strong>State:</strong> ${college.state}</div>
-                                <div class="detail-item">🎯 <strong>Cutoff Rank:</strong> ${college.cutoff.toLocaleString()}</div>
-                                <div class="detail-item">💰 <strong>Fees:</strong> ${college.fees}</div>
-                                <div class="detail-item">⭐ <strong>Rating:</strong> ${college.rating}/5.0</div>
-                                <div class="detail-item">📈 <strong>Placement:</strong> ${college.placement}</div>
-                                <div class="detail-item">💼 <strong>Avg Package:</strong> ${college.avgPackage}</div>
-                                ${college.aiPrediction ? `<div class="ai-prediction">🤖 AI: ${college.aiPrediction}</div>` : ''}
-                                ${college.pros && college.cons ? `
-                                <div class="pros-cons">
-                                    <div class="pros">✅ <strong>Pros:</strong> ${college.pros.slice(0, 2).join(', ')}</div>
-                                    <div class="cons">❌ <strong>Cons:</strong> ${college.cons.slice(0, 2).join(', ')}</div>
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    `}).join('')}
+                <div class="college-grid" id="college-grid">
+                    ${generateCollegeCards(colleges.slice(0, ITEMS_PER_PAGE))}
                 </div>
-                ${colleges.length > 50 ? `<p style="text-align: center; margin-top: 20px; color: #6b7280;">Showing top 50 results. ${colleges.length - 50} more colleges available.</p>` : ''}
+                <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #6b7280;">
+                    <div class="loading-spinner">⏳ Loading more colleges...</div>
+                </div>
+                <div id="end-message" style="display: none; text-align: center; padding: 20px; color: #6b7280; font-style: italic;">
+                    🎉 You've reached the end! All ${colleges.length} colleges have been loaded.
+                </div>
             `;
             
             container.innerHTML = resultsHTML;
+            
+            // Update displayed count
+            displayedCount = Math.min(ITEMS_PER_PAGE, colleges.length);
+            
+            // Setup infinite scrolling
+            setupInfiniteScroll();
         }
         
-        // Auto-predict on page load with default values
-        window.onload = function() {
+        function generateCollegeCards(colleges) {
+            return colleges.map(college => {
+                const seatStatusClass = college.seatStatus === 'available' ? 'seats-available' : 
+                                      college.seatStatus === 'limited' ? 'seats-limited' : 'seats-full';
+                const seatStatusText = college.seatStatus === 'available' ? `${college.availableSeats} Available` : 
+                                     college.seatStatus === 'limited' ? `${college.availableSeats} Left` : 'Full';
+                
+                return `
+                <div class="college-card">
+                    <div class="college-name">${college.name}</div>
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                        <div class="college-type type-${college.type.toLowerCase()}">${college.type}</div>
+                        <div class="seat-status ${seatStatusClass}">🪑 ${seatStatusText}</div>
+                        ${college.scholarship ? `<div class="scholarship-badge">💰 ${college.scholarship}</div>` : ''}
+                    </div>
+                    <div class="college-details">
+                        <div class="detail-item">📍 <strong>State:</strong> ${college.state}</div>
+                        <div class="detail-item">🎯 <strong>Cutoff Rank:</strong> ${college.cutoff.toLocaleString()}</div>
+                        <div class="detail-item">💰 <strong>Fees:</strong> ${college.fees}</div>
+                        <div class="detail-item">⭐ <strong>Rating:</strong> ${college.rating}/5.0</div>
+                        <div class="detail-item">📈 <strong>Placement:</strong> ${college.placement}</div>
+                        <div class="detail-item">💼 <strong>Avg Package:</strong> ${college.avgPackage}</div>
+                        ${college.aiPrediction ? `<div class="ai-prediction">🤖 AI: ${college.aiPrediction}</div>` : ''}
+                        ${college.pros && college.cons ? `
+                        <div class="pros-cons">
+                            <div class="pros">✅ <strong>Pros:</strong> ${college.pros.slice(0, 2).join(', ')}</div>
+                            <div class="cons">❌ <strong>Cons:</strong> ${college.cons.slice(0, 2).join(', ')}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+        
+        function setupInfiniteScroll() {
+            // Remove existing scroll listener
+            window.removeEventListener('scroll', handleScroll);
+            
+            // Add new scroll listener
+            window.addEventListener('scroll', handleScroll);
+        }
+        
+        function handleScroll() {
+            // Update scroll progress indicator
+            updateScrollProgress();
+            
+            if (isLoading || displayedCount >= currentColleges.length) return;
+            
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            
+            // Load more when user is near bottom (within 200px)
+            if (scrollTop + windowHeight >= documentHeight - 200) {
+                loadMoreColleges();
+            }
+        }
+        
+        function updateScrollProgress() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            const scrollPercent = (scrollTop / (documentHeight - windowHeight)) * 100;
+            
+            const progressBar = document.getElementById('scroll-progress');
+            if (progressBar) {
+                progressBar.style.width = Math.min(scrollPercent, 100) + '%';
+            }
+        }
+        
+        function loadMoreColleges() {
+            if (isLoading || displayedCount >= currentColleges.length) return;
+            
+            isLoading = true;
+            
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+            
+            // Simulate loading delay for better UX
             setTimeout(() => {
-                predictColleges();
-            }, 500);
-        };
+                const collegeGrid = document.getElementById('college-grid');
+                const nextBatch = currentColleges.slice(displayedCount, displayedCount + ITEMS_PER_PAGE);
+                
+                // Add new college cards
+                collegeGrid.innerHTML += generateCollegeCards(nextBatch);
+                
+                // Update displayed count
+                displayedCount += nextBatch.length;
+                
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+                
+                // Show end message if all colleges are loaded
+                if (displayedCount >= currentColleges.length) {
+                    const endMessage = document.getElementById('end-message');
+                    if (endMessage) {
+                        endMessage.style.display = 'block';
+                    }
+                }
+                
+                isLoading = false;
+            }, 300); // 300ms delay for smooth loading
+        }
+        
+        // Infinite scrolling variables
+        let currentColleges = [];
+        let displayedCount = 0;
+        let isLoading = false;
+        const ITEMS_PER_PAGE = 20;
+        
+        // Database loading is handled asynchronously with auto-predict
     </script>
 </body>
 </html>

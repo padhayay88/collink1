@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Landmark, Stethoscope, X, Search, List } from 'lucide-react'
+import { Landmark, Stethoscope, X, Search, List, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 
 export default function CollegesAside() {
@@ -10,6 +10,60 @@ export default function CollegesAside() {
   const [loading, setLoading] = useState(false)
   const [list, setList] = useState<string[]>([])
   const [q, setQ] = useState('')
+  const [displayLimit, setDisplayLimit] = useState(50)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadingRef = useRef<HTMLDivElement>(null)
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    if (!term) return list
+    return list.filter(n => n.toLowerCase().includes(term))
+  }, [list, q])
+
+  const displayedFiltered = filtered.slice(0, displayLimit)
+
+  // Infinite scroll callback
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return
+    
+    setIsLoadingMore(true)
+    setTimeout(() => {
+      setDisplayLimit(prev => {
+        const newLimit = prev + 50
+        if (newLimit >= filtered.length) {
+          setHasMore(false)
+        }
+        return newLimit
+      })
+      setIsLoadingMore(false)
+    }, 300)
+  }, [isLoadingMore, hasMore, filtered.length])
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current)
+    }
+
+    observerRef.current = observer
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [loadMore, hasMore, isLoadingMore])
 
   useEffect(() => {
     const loadCounts = async () => {
@@ -25,15 +79,11 @@ export default function CollegesAside() {
     loadCounts()
   }, [])
 
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    if (!term) return list
-    return list.filter(n => n.toLowerCase().includes(term))
-  }, [list, q])
-
   const openList = async (exam: 'jee' | 'neet') => {
     setOpen(exam)
     setLoading(true)
+    setDisplayLimit(50)
+    setHasMore(true)
     try {
       const data = await api.getAllColleges({ exam, limit: 0 })
       const arr = Array.isArray((data as any)?.colleges) ? (data as any).colleges : []
@@ -125,9 +175,35 @@ export default function CollegesAside() {
                   <div className="text-sm text-gray-500">Loading...</div>
                 ) : (
                   <div className="max-h-[60vh] overflow-auto divide-y border rounded-lg">
-                    {filtered.map((name, i) => (
+                    {displayedFiltered.map((name, i) => (
                       <div key={i} className="px-4 py-2 text-sm text-gray-800">{name}</div>
                     ))}
+                    
+                    {/* Infinite Scroll Loading Indicator */}
+                    {hasMore && filtered.length > 0 && (
+                      <div ref={loadingRef} className="flex justify-center py-4">
+                        <div className="flex items-center space-x-2 text-gray-600">
+                          {isLoadingMore ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="text-sm">Loading more colleges...</span>
+                            </>
+                          ) : (
+                            <span className="text-sm">Scroll down to load more colleges</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* End of Results */}
+                    {!hasMore && filtered.length > 0 && (
+                      <div className="text-center py-4">
+                        <div className="text-sm text-gray-500">
+                          You've seen all {filtered.length} colleges
+                        </div>
+                      </div>
+                    )}
+
                     {filtered.length === 0 && (
                       <div className="px-4 py-6 text-sm text-gray-500 text-center">No colleges found.</div>
                     )}
