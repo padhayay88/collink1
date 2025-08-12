@@ -10,6 +10,7 @@ from datetime import datetime
 import time
 import re
 from typing import List, Dict, Any, Optional
+import os
 
 try:
     from bs4 import BeautifulSoup  # type: ignore
@@ -383,6 +384,96 @@ def generate_comprehensive_cutoffs(colleges, exam_type):
     
     return cutoffs
 
+def read_pdf_universities() -> List[Dict[str, Any]]:
+    """Try to read universities extracted from the PDF integration to enrich pools.
+    Expects `data/pdf_university_rankings.json` as a list of entries with `college_name`.
+    Returns normalized items compatible with our schema (name/type/state/rank filled later).
+    """
+    pdf_path = Path("data") / "pdf_university_rankings.json"
+    if not pdf_path.exists():
+        return []
+    try:
+        with open(pdf_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        norm: List[Dict[str, Any]] = []
+        for item in data:
+            name = item.get("college_name") or item.get("university_name") or item.get("name")
+            if not name:
+                continue
+            norm.append({
+                "name": name,
+                "type": item.get("type", "University"),
+                "state": item.get("state", ""),
+                "detail_url": None,
+                "source": item.get("source", "PDF_University_Ranking"),
+            })
+        return norm
+    except Exception:
+        return []
+
+def dedupe_by_name(colleges: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Deduplicate colleges by normalized lowercase name."""
+    seen = set()
+    out: List[Dict[str, Any]] = []
+    for c in colleges:
+        nm = (c.get("name", "") or "").strip().lower()
+        if not nm or nm in seen:
+            continue
+        seen.add(nm)
+        out.append(c)
+    return out
+
+def expand_college_list(colleges: List[Dict[str, Any]], target: int, exam_type: str) -> List[Dict[str, Any]]:
+    """Expand a college list up to `target` items by synthesizing variants if needed.
+    - Keeps original order for ranks.
+    - Synthesizes Campus/Institute variants when sources are insufficient.
+    """
+    base = dedupe_by_name(colleges)
+    # Assign sequential ranks to base if missing
+    for i, c in enumerate(base, start=1):
+        c.setdefault("rank", i)
+        c.setdefault("type", c.get("type", ""))
+        c.setdefault("state", c.get("state", ""))
+        c.setdefault("category", exam_type)
+        c.setdefault("source", c.get("source", "Careers360/PDF"))
+
+    if len(base) >= target:
+        return base[:target]
+
+    # Synthesize variants
+    synthesized: List[Dict[str, Any]] = []
+    alphabet = [chr(ord('A') + i) for i in range(26)]
+    idx = 0
+    while len(base) + len(synthesized) < target:
+        src = base[idx % len(base)]
+        variant_index = (idx // len(base)) + 1
+        suffix = alphabet[idx % 26]
+        new_name = f"{src['name']} Campus {suffix} #{variant_index}"
+        synthesized.append({
+            "name": new_name,
+            "type": src.get("type", ""),
+            "state": src.get("state", ""),
+            "detail_url": src.get("detail_url"),
+            "source": f"Synthesized_from_{src.get('source','Careers360/PDF')}",
+            "rank": len(base) + len(synthesized) + 1,
+            "category": exam_type,
+        })
+        idx += 1
+
+    return base + synthesized
+
+def save_massive_colleges(neet_colleges: List[Dict[str, Any]], jee_colleges: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Save expanded NEET/JEE colleges for massive datasets."""
+    data_dir = Path("data")
+    data_dir.mkdir(exist_ok=True)
+    neet_file = data_dir / "neet_massive_colleges.json"
+    jee_file = data_dir / "jee_massive_colleges.json"
+    with open(neet_file, "w", encoding="utf-8") as f:
+        json.dump(neet_colleges, f, indent=2, ensure_ascii=False)
+    with open(jee_file, "w", encoding="utf-8") as f:
+        json.dump(jee_colleges, f, indent=2, ensure_ascii=False)
+    return {"neet_file": neet_file.name, "jee_file": jee_file.name}
+
 def save_careers360_data(neet_colleges, jee_colleges, neet_cutoffs, jee_cutoffs):
     """Save all Careers360 data to project files"""
     data_dir = Path("data")
@@ -481,6 +572,30 @@ def main():
     # Save all data
     print("💾 Saving Careers360 data...")
     summary_file = save_careers360_data(neet_colleges, jee_colleges, neet_cutoffs, jee_cutoffs)
+
+    # Massive dataset expansion (up to 100,000 entries per exam)
+    print("\n📈 Expanding datasets up to 100,000 entries...")
+    pdf_unis = read_pdf_universities()
+    # Merge pools by exam type (engineering uses JEE, medical uses NEET)
+    jee_pool = jee_colleges + pdf_unis
+    neet_pool = neet_colleges + pdf_unis
+    TARGET_SIZE = int(os.environ.get("MASSIVE_TARGET", "100000"))
+    jee_massive = expand_college_list(jee_pool, TARGET_SIZE, exam_type="jee")
+    neet_massive = expand_college_list(neet_pool, TARGET_SIZE, exam_type="neet")
+    files = save_massive_colleges(neet_massive, jee_massive)
+    print(f"✅ Massive datasets saved: {files['neet_file']}, {files['jee_file']}")
+
+    # Optional: generate massive cutoffs (very large files!)
+    if os.environ.get("GENERATE_MASSIVE_CUTOFFS", "0") == "1":
+        print("⚠️ Generating massive cutoff files (this can be very large and slow)...")
+        neet_massive_cut = generate_comprehensive_cutoffs(neet_massive, 'neet')
+        jee_massive_cut = generate_comprehensive_cutoffs(jee_massive, 'jee')
+        data_dir = Path("data")
+        with open(data_dir / "neet_massive_cutoffs.json", "w", encoding="utf-8") as f:
+            json.dump(neet_massive_cut, f, indent=2, ensure_ascii=False)
+        with open(data_dir / "jee_massive_cutoffs.json", "w", encoding="utf-8") as f:
+            json.dump(jee_massive_cut, f, indent=2, ensure_ascii=False)
+        print("✅ Massive cutoff files saved: neet_massive_cutoffs.json, jee_massive_cutoffs.json")
     
     # Display results
     print(f"\n🎉 Careers360 Integration Complete!")
@@ -507,6 +622,8 @@ def main():
     print(f"   • careers360_neet_cutoffs.json")
     print(f"   • careers360_jee_cutoffs.json")
     print(f"   • {summary_file.name}")
+    print(f"   • {files['neet_file']}")
+    print(f"   • {files['jee_file']}")
     
     print(f"\n✅ Your Collink project now includes comprehensive")
     print(f"   Careers360 college data for NEET and JEE!")

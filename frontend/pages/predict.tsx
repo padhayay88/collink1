@@ -8,6 +8,8 @@ import { motion } from 'framer-motion'
 import { PredictionResponse } from '../lib/api'
 import SaveCompareBar from '../components/SaveCompareBar'
 import BranchBrowser from '../components/BranchBrowser'
+import dynamic from 'next/dynamic'
+const CollegesAside = dynamic(() => import('../components/CollegesAside'), { ssr: false })
 
 export default function Predict() {
   const [predictionData, setPredictionData] = useState<PredictionResponse | null>(null)
@@ -188,6 +190,7 @@ export default function Predict() {
           </div>
         </div>
         <SaveCompareBar userId="local-user" />
+        <CollegesAside />
       </div>
     </>
   )

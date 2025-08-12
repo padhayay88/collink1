@@ -5,8 +5,28 @@ import { ArrowRight, CheckCircle, BarChart2, GraduationCap, Search, TrendingUp, 
 import Header from '../components/Header'
 import Hero from '../components/Hero'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import { useEffect, useState } from 'react'
 
 export default function Home() {
+  const [counts, setCounts] = useState<{ neet: number; jee: number; pdf_universities: number; total: number } | null>(null)
+  const [loadingCounts, setLoadingCounts] = useState<boolean>(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/stats')
+        if (res.ok) {
+          const data = await res.json()
+          setCounts({ neet: data.neet || 0, jee: data.jee || 0, pdf_universities: data.pdf_universities || 0, total: data.total || 0 })
+        }
+      } catch (e) {
+        // silent fail; keep defaults
+      } finally {
+        setLoadingCounts(false)
+      }
+    }
+    fetchStats()
+  }, [])
   const features = [
     {
       icon: <GraduationCap className="w-8 h-8" />,
@@ -47,10 +67,10 @@ export default function Home() {
   ]
 
   const stats = [
-    { number: '80+', label: 'Colleges & Universities' },
-    { number: '3', label: 'Competitive Exams' },
-    { number: '100%', label: 'Real Data' },
-    { number: '2023', label: 'Latest Data' }
+    { number: loadingCounts ? '…' : String(counts?.jee ?? 0), label: 'JEE Colleges (Careers360)' },
+    { number: loadingCounts ? '…' : String(counts?.neet ?? 0), label: 'NEET Colleges (Careers360)' },
+    { number: loadingCounts ? '…' : String(counts?.pdf_universities ?? 0), label: 'Universities (PDF)' },
+    { number: loadingCounts ? '…' : String(counts?.total ?? 0), label: 'Total Listed' }
   ]
 
   return (

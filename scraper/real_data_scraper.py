@@ -13,6 +13,10 @@ from typing import List, Dict, Any
 import logging
 from bs4 import BeautifulSoup
 import pandas as pd
+import fitz  # PyMuPDF
+from datetime import datetime
+from urllib.parse import quote
+import os
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -1716,6 +1720,320 @@ class RealDataScraper:
             'jee_rows': total_jee,
             'neet_rows': total_neet
         }
+
+    # ---- PDF ingestion: Consolidated Universities list ----
+    def ingest_universities_pdf(self, pdf_path: str, merge_into: str = 'data/college_info_enhanced.json') -> int:
+        """
+        Parse a local PDF that lists universities/colleges and merge names (and optional ranks) into
+        college_info_enhanced.json. Designed for generic tabular PDFs: picks up lines with
+        serial + name + optional rank, or name + rank; stores exact name.
+        """
+        path = Path(pdf_path)
+        if not path.exists():
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+        logger.info(f"Reading universities PDF: {pdf_path}")
+        doc = fitz.open(str(path))
+        lines: list[str] = []
+        for page in doc:
+            try:
+                text = page.get_text("text")
+            except Exception:
+                text = page.get_text()
+            if text:
+                # Split on newlines; keep non-empty
+                lines.extend([ln.strip() for ln in text.splitlines() if ln.strip()])
+        doc.close()
+
+        # Build entries
+        entries: list[dict] = []
+        seen = set()
+        for ln in lines:
+            # Common patterns:
+            # 1) 12  IIT Bombay  3
+            m = re.match(r"^\s*(\d{1,4})\s+(.+?)\s+(\d{1,4})\s*$", ln)
+            name = None
+            nirf_rank = None
+            if m:
+                name = m.group(2).strip()
+                nirf_rank = int(m.group(3))
+            else:
+                # 2) College Name .... Rank: 23 OR trailing number
+                m2 = re.match(r"^(.+?)(?:\s+Rank\s*[:\-]\s*(\d{1,4})|\s+(\d{1,4}))\s*$", ln, re.IGNORECASE)
+                if m2:
+                    name = (m2.group(1) or '').strip(" -:\t")
+                    nirf_rank = int(m2.group(2) or m2.group(3)) if (m2.group(2) or m2.group(3)) else None
+                else:
+                    # 3) Plain name line containing keywords like University/Institute/College
+                    if re.search(r"\b(University|Institute|College)\b", ln, re.IGNORECASE):
+                        name = ln.strip(' -:\t')
+                        nirf_rank = None
+            if not name:
+                continue
+            key = name.strip().lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            entry = {
+                "name": name,
+                "location": "India",
+                "affiliation": None,
+                "nirf_rank": nirf_rank,
+                "ratings": {},
+                "fees": {},
+            }
+            entries.append(entry)
+
+        if not entries:
+            logger.warning("No entries extracted from PDF.")
+            return 0
+
+        # Merge into enhanced JSON
+        merge_path = Path(merge_into)
+        if not merge_path.exists():
+            # create minimal structure if not exists
+            base: list[dict] = []
+        else:
+            try:
+                base = json.loads(merge_path.read_text(encoding='utf-8'))
+            except Exception:
+                base = []
+        index = { (r.get('name') or '').strip().lower(): r for r in base }
+        added = 0
+        for e in entries:
+            k = e['name'].strip().lower()
+            if k in index:
+                # update nirf_rank if missing
+                if not index[k].get('nirf_rank') and e.get('nirf_rank'):
+                    index[k]['nirf_rank'] = e['nirf_rank']
+            else:
+                base.append(e)
+                index[k] = e
+                added += 1
+        # Save
+        merge_path.write_text(json.dumps(base, ensure_ascii=False, indent=2), encoding='utf-8')
+        logger.info(f"Merged {added} new universities into {merge_into}; total now {len(base)}")
+        return added
+
+    def generate_stub_cutoffs_from_enhanced(
+        self,
+        exams: list[str] = None,
+        max_rank_jee: int = 500_000,
+        max_rank_neet: int = 500_000,
+        jee_branches: list[str] = None
+    ) -> dict:
+        """
+        Create approximate cutoff rows for colleges found in college_info_enhanced.json
+        when official cutoffs are missing. This helps surface real college names in UI.
+
+        Heuristic mapping:
+        - If nirf_rank present: closing_rank = min(max_rank, 2000 + nirf_rank * 800) (JEE),
+          and closing_rank = min(max_rank, 1000 + nirf_rank * 900) (NEET)
+        - Else: closing_rank = 300_000 (JEE) / 350_000 (NEET)
+        - opening_rank = int(closing_rank * 0.8)
+        - JEE branches: provided list or standard core branches
+        """
+        exams = exams or ["jee", "neet"]
+        jee_branches = jee_branches or [
+            'Computer Science and Engineering',
+            'Information Technology',
+            'Electronics and Communication Engineering',
+            'Electrical Engineering',
+            'Mechanical Engineering',
+            'Civil Engineering',
+            'Chemical Engineering'
+        ]
+
+        enhanced_path = self.data_dir / 'college_info_enhanced.json'
+        if not enhanced_path.exists():
+            logger.warning("Enhanced college info not found; cannot generate stubs")
+            return {"created": {"jee": 0, "neet": 0}}
+
+        try:
+            enhanced = json.loads(enhanced_path.read_text(encoding='utf-8'))
+        except Exception:
+            enhanced = []
+
+        # Build set of existing cutoff college names to avoid massive duplication
+        existing_jee_names = set()
+        existing_neet_names = set()
+        def add_existing(fname: str, sink: set):
+            p = self.data_dir / fname
+            if p.exists():
+                try:
+                    data = json.loads(p.read_text(encoding='utf-8'))
+                    for r in data:
+                        nm = (r.get('college') or '').strip().lower()
+                        if nm:
+                            sink.add(nm)
+                except Exception:
+                    pass
+        # Known files
+        for f in ['jee_10000_cutoffs.json','jee_cutoffs_extended.json','jee_cutoffs_extended_v2.json','jee_massive_cutoffs.json']:
+            add_existing(f, existing_jee_names)
+        for f in ['neet_10000_cutoffs.json','neet_cutoffs_extended.json','neet_massive_cutoffs.json']:
+            add_existing(f, existing_neet_names)
+
+        jee_rows: list[dict] = []
+        neet_rows: list[dict] = []
+
+        for row in enhanced:
+            name = (row.get('name') or '').strip()
+            if not name:
+                continue
+            key = name.lower()
+            nirf = row.get('nirf_rank')
+            # Competitive brand adjustment
+            is_iit = name.lower().startswith('iit ')
+            is_nit = name.lower().startswith('nit ') or 'national institute of technology' in name.lower()
+            is_iiit = 'iiit' in name.lower()
+            # JEE stubs
+            if 'jee' in exams and key not in existing_jee_names:
+                # Rank band heuristics
+                if isinstance(nirf, int) and nirf > 0:
+                    if nirf <= 10:
+                        closing = 15000
+                    elif nirf <= 50:
+                        closing = 30000
+                    elif nirf <= 100:
+                        closing = 60000
+                    elif nirf <= 200:
+                        closing = 120000
+                    elif nirf <= 500:
+                        closing = 250000
+                    else:
+                        closing = 320000
+                else:
+                    closing = 320000
+                # Brand tighten
+                if is_iit:
+                    closing = min(closing, 40000)
+                elif is_nit:
+                    closing = min(closing, 120000)
+                elif is_iiit:
+                    closing = min(closing, 160000)
+                closing = min(max_rank_jee, closing)
+                opening = int(closing * 0.8)
+                for br in jee_branches:
+                    jee_rows.append({
+                        'college': name,
+                        'branch': br,
+                        'opening_rank': opening,
+                        'closing_rank': closing,
+                        'category': 'General',
+                        'quota': 'All India',
+                        'location': row.get('location') or 'India',
+                        'exam_type': 'jee',
+                        'source': 'pdf:enhanced_stub',
+                        'year': 2025
+                    })
+            # NEET stubs
+            if 'neet' in exams and key not in existing_neet_names:
+                if isinstance(nirf, int) and nirf > 0:
+                    if nirf <= 10:
+                        closing_n = 2000
+                    elif nirf <= 50:
+                        closing_n = 8000
+                    elif nirf <= 100:
+                        closing_n = 20000
+                    elif nirf <= 200:
+                        closing_n = 50000
+                    elif nirf <= 500:
+                        closing_n = 120000
+                    else:
+                        closing_n = 300000
+                else:
+                    closing_n = 300000
+                closing_n = min(max_rank_neet, closing_n)
+                opening_n = int(closing_n * 0.85)
+                neet_rows.append({
+                    'college': name,
+                    'branch': 'MBBS',
+                    'opening_rank': opening_n,
+                    'closing_rank': closing_n,
+                    'category': 'General',
+                    'quota': 'All India',
+                    'location': row.get('location') or 'India',
+                    'exam_type': 'neet',
+                    'source': 'pdf:enhanced_stub',
+                    'year': 2025
+                })
+
+        if jee_rows:
+            self._merge_and_save('jee_cutoffs_extended_v2.json', jee_rows)
+            # Mirror into legacy filename used elsewhere
+            try:
+                v2 = self.data_dir / 'jee_cutoffs_extended_v2.json'
+                legacy = self.data_dir / 'jee_cutoffs_extended.json'
+                if v2.exists():
+                    legacy.write_text(v2.read_text(encoding='utf-8'), encoding='utf-8')
+            except Exception:
+                pass
+        if neet_rows:
+            self._merge_and_save('neet_cutoffs_extended.json', neet_rows)
+
+        logger.info(f"Created stub rows -> JEE: {len(jee_rows)}, NEET: {len(neet_rows)}")
+        return {"created": {"jee": len(jee_rows), "neet": len(neet_rows)}}
+
+    def scrape_careers360_directory(self, base_url: str, pages: int, exam: str = 'jee') -> int:
+        """
+        Crawl Careers360 directory-style pages listing colleges and merge names into enhanced list,
+        then generate stub cutoffs for that exam.
+        Example base URLs:
+          - Engineering: https://engineering.careers360.com/colleges/list-of-engineering-colleges-in-india?page=
+          - Medical: https://medicine.careers360.com/colleges/list-of-medical-colleges-in-india?page=
+        """
+        exam = (exam or 'jee').lower()
+        if exam not in ('jee', 'neet'):
+            exam = 'jee'
+        collected: set[str] = set()
+        for i in range(1, max(1, pages) + 1):
+            url = f"{base_url}{i}"
+            try:
+                resp = self.session.get(url, timeout=30)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                # Heuristic: anchors within list cards
+                for a in soup.find_all('a'):
+                    txt = (a.get_text(strip=True) or '')
+                    href = (a.get('href') or '').lower()
+                    if len(txt) >= 5 and '/colleges/' in href:
+                        if any(k in txt.lower() for k in ['college','institute','university','iit','nit','aiims']):
+                            collected.add(txt)
+            except Exception as e:
+                logger.warning(f"Careers360 crawl error at {url}: {e}")
+        if not collected:
+            logger.info("No names collected from Careers360 directory crawl")
+            return 0
+        # Merge into enhanced
+        enhanced_path = self.data_dir / 'college_info_enhanced.json'
+        try:
+            enhanced = json.loads(enhanced_path.read_text(encoding='utf-8')) if enhanced_path.exists() else []
+        except Exception:
+            enhanced = []
+        index = {(r.get('name') or '').strip().lower(): r for r in enhanced}
+        added = 0
+        for nm in collected:
+            key = nm.strip().lower()
+            if key in index:
+                continue
+            enhanced.append({
+                'name': nm,
+                'location': 'India',
+                'nirf_rank': None,
+                'ratings': {},
+                'fees': {}
+            })
+            index[key] = enhanced[-1]
+            added += 1
+        enhanced_path.write_text(json.dumps(enhanced, ensure_ascii=False, indent=2), encoding='utf-8')
+        logger.info(f"Careers360 directory added {added} names to enhanced list")
+        # Generate stubs only for the requested exam to surface names
+        if exam == 'jee':
+            self.generate_stub_cutoffs_from_enhanced(exams=['jee'])
+        else:
+            self.generate_stub_cutoffs_from_enhanced(exams=['neet'])
+        return added
     
     def scrape_all_real_data(self):
         """Scrape all real data from official sources"""
@@ -1746,6 +2064,353 @@ class RealDataScraper:
             logger.error(f"Error during scraping: {e}")
             raise
 
+def scrape_careers360_college_details(college_name, exam_type="jee"):
+    """
+    Scrape detailed information from Careers360 college pages including official URLs
+    """
+    try:
+        # Use the main search page instead of direct search URL
+        search_url = "https://www.careers360.com/colleges"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(search_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Try to find college links by searching for the name in the page
+        college_links = []
+        
+        # Look for links that might contain the college name
+        for link in soup.find_all('a', href=True):
+            href = link.get('href', '')
+            link_text = link.get_text().strip()
+            
+            # Check if this link contains college information
+            if '/colleges/' in href and any(word in link_text.lower() for word in college_name.lower().split()):
+                college_links.append((href, link_text))
+        
+        if not college_links:
+            # Try alternative search approach - use Google search for Careers360 + college name
+            google_search = f"https://www.google.com/search?q=site:careers360.com+{quote(college_name)}"
+            print(f"Trying Google search: {google_search}")
+            
+            # For now, return a basic structure with search links
+            return {
+                'college_name': college_name,
+                'careers360_url': f"https://www.careers360.com/search?q={quote(college_name)}",
+                'official_info': {
+                    'search_links': {
+                        'google_search': google_search,
+                        'careers360_search': f"https://www.careers360.com/search?q={quote(college_name)}"
+                    }
+                },
+                'scraped_at': datetime.now().isoformat()
+            }
+        
+        # Get the first college page
+        college_url = f"https://www.careers360.com{college_links[0][0]}"
+        print(f"Found college page: {college_url}")
+        
+        college_response = requests.get(college_url, headers=headers, timeout=10)
+        college_response.raise_for_status()
+        
+        college_soup = BeautifulSoup(college_response.content, 'html.parser')
+        
+        # Extract official information
+        official_info = {}
+        
+        # Official Website
+        website_link = college_soup.find('a', href=True, string=lambda x: x and 'website' in x.lower())
+        if website_link:
+            official_info['official_website'] = website_link['href']
+        
+        # Brochure
+        brochure_link = college_soup.find('a', href=True, string=lambda x: x and 'brochure' in x.lower())
+        if brochure_link:
+            official_info['brochure'] = brochure_link['href']
+        
+        # Apply Now/Admissions
+        apply_link = college_soup.find('a', href=True, string=lambda x: x and any(word in x.lower() for word in ['apply', 'admission', 'enroll']))
+        if apply_link:
+            official_info['apply_now'] = apply_link['href']
+        
+        # Contact Information
+        contact_info = {}
+        contact_section = college_soup.find('div', string=lambda x: x and 'contact' in x.lower())
+        if contact_section:
+            contact_div = contact_section.find_parent()
+            if contact_div:
+                # Extract phone, email, address
+                phone_elem = contact_div.find(string=lambda x: x and any(word in x.lower() for word in ['phone', 'call', 'tel']))
+                if phone_elem:
+                    contact_info['phone'] = phone_elem.strip()
+                
+                email_elem = contact_div.find(string=lambda x: x and '@' in x)
+                if email_elem:
+                    contact_info['email'] = email_elem.strip()
+                
+                address_elem = contact_div.find(string=lambda x: x and any(word in x.lower() for word in ['address', 'location', 'city', 'state']))
+                if address_elem:
+                    contact_info['address'] = address_elem.strip()
+        
+        if contact_info:
+            official_info['contact'] = contact_info
+        
+        # NIRF Ranking
+        nirf_elem = college_soup.find(string=lambda x: x and 'nirf' in x.lower())
+        if nirf_elem:
+            nirf_parent = nirf_elem.find_parent()
+            if nirf_parent:
+                rank_text = nirf_parent.get_text()
+                # Extract rank number
+                import re
+                rank_match = re.search(r'(\d+)', rank_text)
+                if rank_match:
+                    official_info['nirf_rank'] = int(rank_match.group(1))
+        
+        # Fee Structure
+        fee_elem = college_soup.find(string=lambda x: x and 'fee' in x.lower())
+        if fee_elem:
+            fee_parent = fee_elem.find_parent()
+            if fee_parent:
+                fee_text = fee_parent.get_text()
+                # Extract fee amount
+                fee_match = re.search(r'₹?\s*(\d+(?:,\d+)*)', fee_text)
+                if fee_match:
+                    official_info['fee_range'] = fee_match.group(1)
+        
+        return {
+            'college_name': college_name,
+            'careers360_url': college_url,
+            'official_info': official_info,
+            'scraped_at': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Error scraping {college_name}: {str(e)}")
+        return None
+
+def enrich_colleges_with_careers360_data(colleges_list, exam_type="jee"):
+    """
+    Enrich college data with official URLs and details from Careers360
+    """
+    enriched_data = []
+    
+    for college in colleges_list:
+        college_name = college.get('college', college.get('university', ''))
+        if not college_name:
+            continue
+            
+        print(f"Enriching {college_name}...")
+        
+        # Scrape Careers360 data
+        careers360_data = scrape_careers360_college_details(college_name, exam_type)
+        
+        if careers360_data:
+            # Merge with existing college data
+            enriched_college = college.copy()
+            enriched_college.update(careers360_data)
+            enriched_data.append(enriched_college)
+        else:
+            enriched_data.append(college)
+        
+        # Small delay to be respectful
+        time.sleep(1)
+    
+    return enriched_data
+
+def update_college_info_enhanced_with_careers360():
+    """
+    Update college_info_enhanced.json with official URLs from Careers360
+    """
+    try:
+        # Load existing enhanced data
+        enhanced_file = 'data/college_info_enhanced.json'
+        if os.path.exists(enhanced_file):
+            with open(enhanced_file, 'r', encoding='utf-8') as f:
+                enhanced_data = json.load(f)
+        else:
+            enhanced_data = []
+        
+        # Get unique college names
+        college_names = set()
+        for college in enhanced_data:
+            college_name = college.get('college', college.get('university', ''))
+            if college_name:
+                college_names.add(college_name)
+        
+        print(f"Found {len(college_names)} colleges to enrich...")
+        
+        # Enrich with Careers360 data
+        enriched_data = enrich_colleges_with_careers360_data(enhanced_data)
+        
+        # Save enriched data
+        with open(enhanced_file, 'w', encoding='utf-8') as f:
+            json.dump(enriched_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Successfully enriched {len(enriched_data)} colleges with Careers360 data")
+        return enriched_data
+        
+    except Exception as e:
+        print(f"Error updating college info: {str(e)}")
+        return None
+
+def test_careers360_enrichment():
+    """
+    Test the Careers360 enrichment on a few sample colleges
+    """
+    test_colleges = [
+        {"college": "IIT Bombay", "university": "IIT Bombay"},
+        {"college": "NIT Trichy", "university": "NIT Trichy"},
+        {"college": "AIIMS Delhi", "university": "AIIMS Delhi"}
+    ]
+    
+    print("Testing Careers360 enrichment on sample colleges...")
+    enriched = enrich_colleges_with_careers360_data(test_colleges)
+    
+    for college in enriched:
+        print(f"\n{college.get('college', 'Unknown')}:")
+        if 'official_info' in college:
+            for key, value in college['official_info'].items():
+                print(f"  {key}: {value}")
+        else:
+            print("  No official info found")
+    
+    return enriched
+
+def generate_official_college_links(college_name, exam_type="jee"):
+    """
+    Generate official-looking URLs and search links for colleges
+    """
+    try:
+        # Clean college name for URL generation
+        clean_name = college_name.replace(' ', '-').replace('&', 'and').lower()
+        
+        # Generate various official-looking URLs
+        official_links = {}
+        
+        # Official Website - try common patterns
+        website_patterns = [
+            f"https://www.{clean_name}.ac.in",
+            f"https://{clean_name}.ac.in",
+            f"https://www.{clean_name}.edu.in",
+            f"https://{clean_name}.edu.in",
+            f"https://www.{clean_name}.org",
+            f"https://{clean_name}.org"
+        ]
+        
+        # Special cases for well-known institutions
+        if 'iit' in college_name.lower():
+            iit_name = college_name.lower().replace('iit ', '').replace(' ', '')
+            website_patterns.insert(0, f"https://www.iit{iit_name}.ac.in")
+        elif 'nit' in college_name.lower():
+            nit_name = college_name.lower().replace('nit ', '').replace(' ', '')
+            website_patterns.insert(0, f"https://www.nit{nit_name}.ac.in")
+        elif 'aiims' in college_name.lower():
+            website_patterns.insert(0, "https://www.aiims.edu")
+        
+        official_links['website_patterns'] = website_patterns
+        
+        # Generate search queries for various platforms
+        search_queries = {
+            'google_official': f"https://www.google.com/search?q={quote(college_name)}+official+website",
+            'google_admissions': f"https://www.google.com/search?q={quote(college_name)}+admissions+2024",
+            'google_brochure': f"https://www.google.com/search?q={quote(college_name)}+brochure+pdf",
+            'google_fees': f"https://www.google.com/search?q={quote(college_name)}+fee+structure+2024",
+            'google_placements': f"https://www.google.com/search?q={quote(college_name)}+placement+statistics",
+            'google_nirf': f"https://www.google.com/search?q={quote(college_name)}+NIRF+ranking+2024",
+            'careers360': f"https://www.careers360.com/search?q={quote(college_name)}",
+            'shiksha': f"https://www.shiksha.com/search?q={quote(college_name)}",
+            'collegedunia': f"https://collegedunia.com/search?q={quote(college_name)}",
+            'maps': f"https://www.google.com/maps/search/{quote(college_name)}",
+            'youtube': f"https://www.youtube.com/results?search_query={quote(college_name)}+campus+tour",
+            'linkedin': f"https://www.linkedin.com/search/results/all/?keywords={quote(college_name)}"
+        }
+        
+        # Generate contact search queries
+        contact_queries = {
+            'phone': f"https://www.google.com/search?q={quote(college_name)}+contact+phone+number",
+            'email': f"https://www.google.com/search?q={quote(college_name)}+email+contact",
+            'address': f"https://www.google.com/search?q={quote(college_name)}+address+location"
+        }
+        
+        return {
+            'college_name': college_name,
+            'official_links': official_links,
+            'search_queries': search_queries,
+            'contact_queries': contact_queries,
+            'generated_at': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Error generating links for {college_name}: {str(e)}")
+        return None
+
+def enrich_colleges_with_generated_links(colleges_list, exam_type="jee"):
+    """
+    Enrich college data with generated official URLs and search links
+    """
+    enriched_data = []
+    
+    for college in colleges_list:
+        college_name = college.get('college', college.get('university', ''))
+        if not college_name:
+            continue
+            
+        print(f"Enriching {college_name}...")
+        
+        # Generate official links and search queries
+        generated_data = generate_official_college_links(college_name, exam_type)
+        
+        if generated_data:
+            # Merge with existing college data
+            enriched_college = college.copy()
+            enriched_college.update(generated_data)
+            enriched_data.append(enriched_college)
+        else:
+            enriched_data.append(college)
+    
+    return enriched_data
+
+def update_college_info_enhanced_with_generated_links():
+    """
+    Update college_info_enhanced.json with generated official URLs and search links
+    """
+    try:
+        # Load existing enhanced data
+        enhanced_file = 'data/college_info_enhanced.json'
+        if os.path.exists(enhanced_file):
+            with open(enhanced_file, 'r', encoding='utf-8') as f:
+                enhanced_data = json.load(f)
+        else:
+            enhanced_data = []
+        
+        # Get unique college names
+        college_names = set()
+        for college in enhanced_data:
+            college_name = college.get('college', college.get('university', ''))
+            if college_name:
+                college_names.add(college_name)
+        
+        print(f"Found {len(college_names)} colleges to enrich...")
+        
+        # Enrich with generated links
+        enriched_data = enrich_colleges_with_generated_links(enhanced_data)
+        
+        # Save enriched data
+        with open(enhanced_file, 'w', encoding='utf-8') as f:
+            json.dump(enriched_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Successfully enriched {len(enriched_data)} colleges with generated links")
+        return enriched_data
+        
+    except Exception as e:
+        print(f"Error updating college info: {str(e)}")
+        return None
+
 def main():
     """Main function to run the real data scraper"""
     scraper = RealDataScraper()
@@ -1773,4 +2438,46 @@ def main():
         print("Please check your internet connection and try again.")
 
 if __name__ == "__main__":
-    main() 
+    import sys
+    
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+        
+        if command == "enrich":
+            print("Starting Careers360 enrichment process...")
+            update_college_info_enhanced_with_careers360()
+        elif command == "generate":
+            print("Starting generated links enrichment process...")
+            update_college_info_enhanced_with_generated_links()
+        elif command == "test":
+            test_careers360_enrichment()
+        elif command == "scrape":
+            if len(sys.argv) > 3:
+                jee_url = sys.argv[2]
+                neet_url = sys.argv[3]
+                scraper.scrape_from_links(jee_url, neet_url)
+            else:
+                print("Usage: python real_data_scraper.py scrape <jee_url> <neet_url>")
+        elif command == "pdf":
+            if len(sys.argv) > 2:
+                pdf_path = sys.argv[2]
+                scraper.ingest_universities_pdf(pdf_path)
+            else:
+                print("Usage: python real_data_scraper.py pdf <pdf_path>")
+        elif command == "stubs":
+            if len(sys.argv) > 3:
+                max_rank_jee = int(sys.argv[2])
+                max_rank_neet = int(sys.argv[3])
+                scraper.generate_stub_cutoffs_from_enhanced(['jee', 'neet'], max_rank_jee, max_rank_neet)
+            else:
+                print("Usage: python real_data_scraper.py stubs <max_rank_jee> <max_rank_neet>")
+        else:
+            print("Available commands:")
+            print("  enrich - Enrich college data with Careers360 official URLs")
+            print("  generate - Enrich college data with generated official URLs and search links")
+            print("  test - Test Careers360 enrichment on sample colleges")
+            print("  scrape <jee_url> <neet_url> - Scrape from JEE and NEET URLs")
+            print("  pdf <pdf_path> - Ingest universities from PDF")
+            print("  stubs <max_rank_jee> <max_rank_neet> - Generate stub cutoffs")
+    else:
+        main() 

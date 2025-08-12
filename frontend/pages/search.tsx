@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Head from 'next/head'
 import Header from '../components/Header'
 import { motion } from 'framer-motion'
@@ -6,6 +6,11 @@ import { Search, Filter, MapPin, TrendingUp, Star, Users, BookOpen } from 'lucid
 
 export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [visibleCount, setVisibleCount] = useState(20)
+  const [isFetching, setIsFetching] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const pageSize = 20
+  const loaderRef = useRef<HTMLDivElement | null>(null)
   const [filters, setFilters] = useState({
     exam: '',
     location: '',
@@ -56,6 +61,43 @@ export default function SearchPage() {
     college.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     college.location.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const visibleColleges = filteredColleges.slice(0, visibleCount)
+
+  // Reset paging when filters/search change
+  useEffect(() => {
+    setVisibleCount(pageSize)
+    setHasMore(true)
+  }, [searchTerm, filters.exam, filters.location, filters.type, filters.rating])
+
+  // Update hasMore whenever data length changes
+  useEffect(() => {
+    setHasMore(visibleCount < filteredColleges.length)
+  }, [visibleCount, filteredColleges.length])
+
+  const onIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
+    const first = entries[0]
+    if (first.isIntersecting && !isFetching && hasMore) {
+      setIsFetching(true)
+      // Simulate async fetch delay for UX smoothness
+      setTimeout(() => {
+        setVisibleCount(prev => Math.min(prev + pageSize, filteredColleges.length))
+        setIsFetching(false)
+      }, 150)
+    }
+  }, [hasMore, isFetching, filteredColleges.length])
+
+  // Set up intersection observer
+  useEffect(() => {
+    if (!loaderRef.current) return
+    const observer = new IntersectionObserver(onIntersect, { root: null, rootMargin: '0px', threshold: 0.1 })
+    const el = loaderRef.current
+    observer.observe(el)
+    return () => {
+      observer.unobserve(el)
+      observer.disconnect()
+    }
+  }, [onIntersect])
 
   return (
     <>
@@ -154,7 +196,7 @@ export default function SearchPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6">
-              {filteredColleges.map((college, index) => (
+              {visibleColleges.map((college, index) => (
                 <motion.div
                   key={college.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -240,6 +282,16 @@ export default function SearchPage() {
                   </div>
                 </motion.div>
               ))}
+            </div>
+
+            {/* Infinite loader sentinel */}
+            <div ref={loaderRef} className="flex items-center justify-center py-6">
+              {isFetching && (
+                <div className="text-gray-500 text-sm">Loading more results…</div>
+              )}
+              {!hasMore && filteredColleges.length > 0 && (
+                <div className="text-gray-400 text-sm">You have reached the end.</div>
+              )}
             </div>
 
             {/* No Results */}

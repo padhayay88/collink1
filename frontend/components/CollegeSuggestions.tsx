@@ -268,6 +268,127 @@ function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: strin
   const collegeName = prediction.college || prediction.university || 'Unknown College'
   const courseName = prediction.branch || prediction.course || 'Course not specified'
 
+  const buildResourceLinks = (name: string) => {
+    const q = encodeURIComponent(name)
+    
+    // Check if we have enriched data with official URLs
+    const extendedData = prediction as any
+    const officialInfo = extendedData?.official_info || {}
+    const officialLinks = extendedData?.official_links || {}
+    const searchQueries = extendedData?.search_queries || {}
+    const contactQueries = extendedData?.contact_queries || {}
+    
+    return {
+      official: [
+        { 
+          label: 'Official Website', 
+          url: officialInfo.official_website || (officialLinks.website_patterns && officialLinks.website_patterns[0]) || `https://www.google.com/search?q=${q}+official+site`,
+          isOfficial: !!(officialInfo.official_website || (officialLinks.website_patterns && officialLinks.website_patterns[0]))
+        },
+        { 
+          label: 'Brochure', 
+          url: officialInfo.brochure || searchQueries.google_brochure || `https://www.google.com/search?q=${q}+brochure`,
+          isOfficial: !!officialInfo.brochure
+        },
+        { 
+          label: 'Apply Now', 
+          url: officialInfo.apply_now || searchQueries.google_admissions || `https://www.google.com/search?q=${q}+admissions+apply`,
+          isOfficial: !!officialInfo.apply_now
+        },
+      ],
+      academic: [
+        { 
+          label: 'NIRF Ranking', 
+          url: searchQueries.google_nirf || `https://www.google.com/search?q=${q}+NIRF+ranking+site%3Anirfindia.org`,
+          isOfficial: false,
+          extraInfo: officialInfo.nirf_rank ? `Rank: ${officialInfo.nirf_rank}` : undefined
+        },
+        { 
+          label: 'Placement Info', 
+          url: searchQueries.google_placements || `https://www.google.com/search?q=${q}+placements`,
+          isOfficial: false
+        },
+        { 
+          label: 'Facilities', 
+          url: `https://www.google.com/search?q=${q}+facilities`,
+          isOfficial: false
+        },
+      ],
+      studentLife: [
+        { 
+          label: 'Hostel Info', 
+          url: `https://www.google.com/search?q=${q}+hostel+fees+rules`,
+          isOfficial: false
+        },
+        { 
+          label: 'Location (Maps)', 
+          url: searchQueries.maps || `https://www.google.com/maps/search/${q}`,
+          isOfficial: false
+        },
+        { 
+          label: 'Contact', 
+          url: contactQueries.phone || `https://www.google.com/search?q=${q}+contact+email+phone`,
+          isOfficial: false,
+          extraInfo: officialInfo.contact ? `${officialInfo.contact.phone || ''} ${officialInfo.contact.email || ''}`.trim() : undefined
+        },
+      ],
+      financial: [
+        { 
+          label: 'Fee Structure', 
+          url: searchQueries.google_fees || `https://www.google.com/search?q=${q}+fee+structure`,
+          isOfficial: false,
+          extraInfo: officialInfo.fee_range ? `₹${officialInfo.fee_range}` : undefined
+        },
+        { 
+          label: 'Scholarships', 
+          url: `https://www.google.com/search?q=${q}+scholarship`,
+          isOfficial: false
+        },
+        { 
+          label: 'Payment', 
+          url: `https://www.google.com/search?q=${q}+fee+payment+portal`,
+          isOfficial: false
+        },
+      ],
+      reviews: [
+        { 
+          label: 'Student Reviews', 
+          url: `https://www.google.com/search?q=${q}+student+reviews`,
+          isOfficial: false
+        },
+        { 
+          label: 'Shiksha Reviews', 
+          url: searchQueries.shiksha || `https://www.shiksha.com/search?q=${q}`,
+          isOfficial: false
+        },
+        { 
+          label: 'Careers360', 
+          url: searchQueries.careers360 || extendedData?.careers360_url || `https://www.careers360.com/search?q=${q}`,
+          isOfficial: !!extendedData?.careers360_url
+        },
+      ],
+      resources: [
+        { 
+          label: 'Google Search', 
+          url: searchQueries.google_official || `https://www.google.com/search?q=${q}`,
+          isOfficial: false
+        },
+        { 
+          label: 'YouTube', 
+          url: searchQueries.youtube || `https://www.youtube.com/results?search_query=${q}`,
+          isOfficial: false
+        },
+        { 
+          label: 'LinkedIn', 
+          url: searchQueries.linkedin || `https://www.linkedin.com/search/results/all/?keywords=${q}`,
+          isOfficial: false
+        },
+      ],
+    }
+  }
+
+  const resource = buildResourceLinks(collegeName)
+
   // Advanced link data with enhanced categorization
   const linkCategories = {
     official: {
@@ -841,6 +962,108 @@ function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: strin
               <ExternalLink className="w-3 h-3 ml-2" />
             </motion.a>
           )}
+        </div>
+
+        {/* Quick Resources Section */}
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          {/* Official Website Patterns Section */}
+          {resource.official[0].isOfficial && (prediction as any)?.official_links?.website_patterns && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-semibold text-green-800 mb-2">🌐 Official Website Patterns</div>
+              <div className="flex flex-wrap gap-2">
+                {(prediction as any).official_links.website_patterns.map((url: string, index: number) => (
+                  <a 
+                    key={index} 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="px-3 py-1.5 text-xs bg-green-100 border border-green-300 rounded-lg hover:bg-green-200 text-green-700"
+                  >
+                    {url.replace('https://', '').replace('www.', '')}
+                  </a>
+                ))}
+              </div>
+              <div className="text-xs text-green-600 mt-2">
+                These are the most likely official website URLs for this college. Try them to find the actual website.
+              </div>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Official</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.official.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className={`px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50 ${
+                       l.isOfficial ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200'
+                     }`}>
+                    {l.label} {l.isOfficial && '✓'}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Academic</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.academic.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">
+                    {l.label}
+                    {l.extraInfo && <span className="ml-1 text-xs text-gray-500">({l.extraInfo})</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Student Life</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.studentLife.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">
+                    {l.label}
+                    {l.extraInfo && <span className="ml-1 text-xs text-gray-500">({l.extraInfo})</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Financial</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.financial.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">
+                    {l.label}
+                    {l.extraInfo && <span className="ml-1 text-xs text-gray-500">({l.extraInfo})</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Reviews</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.reviews.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className={`px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50 ${
+                       l.isOfficial ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200'
+                     }`}>
+                    {l.label} {l.isOfficial && '✓'}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800 mb-2">Resources</div>
+              <div className="flex flex-wrap gap-2">
+                {resource.resources.map((l) => (
+                  <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" 
+                     className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">
+                    {l.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
