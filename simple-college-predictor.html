@@ -1101,13 +1101,13 @@
             const type = document.getElementById('type').value;
             const search = document.getElementById('search').value.toLowerCase();
             
-            // Remove rank limit validation - allow any rank input
-            // The system will show colleges with cutoff ranks >= user rank
-            if (rank <= 0) {
+            // Validate rank range: 1..200000
+            const MAX_RANK = 200000;
+            if (rank <= 0 || rank > MAX_RANK) {
                 document.getElementById('results-container').innerHTML = `
                     <div class="no-results">
                         <h3>⚠️ Invalid Rank</h3>
-                        <p>Please enter a valid rank greater than 0</p>
+                        <p>Please enter a rank between 1 and ${MAX_RANK.toLocaleString()}</p>
                     </div>
                 `;
                 return;
