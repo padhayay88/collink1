@@ -11,22 +11,22 @@ export default function Home() {
   const [counts, setCounts] = useState<{ neet: number; jee: number; pdf_universities: number; total: number } | null>(null)
   const [loadingCounts, setLoadingCounts] = useState<boolean>(true)
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch('/api/stats')
-        if (res.ok) {
-          const data = await res.json()
-          setCounts({ neet: data.neet || 0, jee: data.jee || 0, pdf_universities: data.pdf_universities || 0, total: data.total || 0 })
+      useEffect(() => {
+        const fetchStats = async () => {
+          try {
+            const res = await fetch('/api/v1/stats')
+            if (res.ok) {
+              const data = await res.json()
+              setCounts({ neet: data.neet || 0, jee: data.jee || 0, pdf_universities: data.pdf_universities || 0, total: data.total || 0 })
+            }
+          } catch (e) {
+            // silent fail; keep defaults
+          } finally {
+            setLoadingCounts(false)
+          }
         }
-      } catch (e) {
-        // silent fail; keep defaults
-      } finally {
-        setLoadingCounts(false)
-      }
-    }
-    fetchStats()
-  }, [])
+        fetchStats()
+      }, [])
   const features = [
     {
       icon: <GraduationCap className="w-8 h-8" />,

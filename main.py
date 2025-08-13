@@ -9,6 +9,7 @@ from pathlib import Path
 # Import routers
 from routers import predict, college, search
 from routers import features
+from routers import stats
 
 app = FastAPI(
     title="Collink - College Predictor API",
@@ -30,6 +31,7 @@ app.include_router(predict.router, prefix="/api/v1", tags=["prediction"])
 app.include_router(college.router, prefix="/api/v1", tags=["college"])
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(features.router, prefix="/api/v1", tags=["features"])
+app.include_router(stats.router, prefix="/api/v1", tags=["stats"])
 
 @app.get("/")
 async def root():
@@ -78,4 +80,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
