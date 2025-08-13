@@ -1,0 +1,8 @@
+# Copy this content to your .env.local file:
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://avquikcghthqcwiscldk.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2dXFpa2NndGhocWN3aXNjbGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMTYzMzIsImV4cCI6MjA3MDY5MjMzMn0.hoZzVT9SsIzXn72ECPyG37MpOgBtldO1Gp4pap61hEE
+
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000
