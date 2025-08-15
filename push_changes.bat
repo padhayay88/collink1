@@ -23,6 +23,12 @@ git rev-parse --verify main >NUL 2>&1 && (
   git checkout -B main || goto :error
 )
 
+echo === Untrack backup directories to avoid large files ===
+for /D %%D in (frontend_backup_*) do (
+  echo Removing from index: %%D
+  git rm -r --cached --ignore-unmatch "%%D" 2>NUL
+)
+
 echo === Stage changes ===
 git add -A || goto :error
 
