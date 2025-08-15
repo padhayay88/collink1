@@ -47,7 +47,7 @@ export default function Header() {
   const filteredStates = states.filter(s => s.toLowerCase().includes(stateQuery.toLowerCase()))
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+<header className="sticky top-0 z-50 bg-gradient-to-r from-blue-600 to-purple-600 border-b border-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -56,12 +56,15 @@ export default function Header() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center space-x-2"
           >
-            <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">Collink</span>
-            </Link>
+              <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <img src="/images/campus.jpg" alt="Project" className="w-10 h-10 rounded-lg object-cover" />
+                  <span className="text-xl font-bold text-white">Collink</span>
+                </div>
+              </Link>
           </motion.div>
 
           {/* Desktop Navigation */}
@@ -77,11 +80,11 @@ export default function Header() {
                   href={item.href}
                   className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive(item.href)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'bg-white bg-opacity-20 text-white'
+                      : 'text-white hover:bg-white hover:bg-opacity-10'
                   }`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="w-4 h-4 text-white" />
                   <span>{item.name}</span>
                 </Link>
               </motion.div>
@@ -97,26 +100,26 @@ export default function Header() {
             <LanguageSwitcher />
             <button
               onClick={openStateModal}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white border-opacity-30 text-white hover:bg-white hover:bg-opacity-20"
               title="Choose State"
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className="w-4 h-4 text-white" />
               <span>Choose State</span>
             </button>
             {isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 <Link
                   href="/profile"
-                  className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-center space-x-2 px-3 py-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
                 >
                   <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-sm font-medium text-gray-700">{user?.name}</span>
+                  <span className="text-sm font-medium text-white">{user?.name}</span>
                 </Link>
                 <button
                   onClick={logout}
-                  className="flex items-center space-x-1 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-center space-x-1 px-3 py-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="text-sm">Logout</span>
@@ -126,13 +129,13 @@ export default function Header() {
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                  className="px-3 py-2 text-white hover:bg-white hover:bg-opacity-20 font-medium transition-colors rounded-lg"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/register"
-                  className="px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                  className="px-3 py-2 text-white hover:bg-white hover:bg-opacity-20 font-medium transition-colors rounded-lg"
                 >
                   Sign Up
                 </Link>
@@ -140,7 +143,7 @@ export default function Header() {
             )}
             <Link
               href="/predict"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-200 ml-1"
+              className="bg-white text-blue-700 px-4 py-2 rounded-lg font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-200 ml-1"
             >
               Get Started
             </Link>
