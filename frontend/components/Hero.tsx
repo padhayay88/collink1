@@ -8,7 +8,7 @@ export default function Hero() {
       {/* Background Elements */}
       <div className="absolute inset-0 opacity-30">
         <img
-          src="/images/campus.jpg"
+          src="/image2.png"
           alt="College Campus"
           className="object-cover w-full h-full rounded-lg"
         />

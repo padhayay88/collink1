@@ -61,7 +61,6 @@ export default function Header() {
                   <GraduationCap className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex items-center space-x-2">
-                  <img src="/images/campus.jpg" alt="Project" className="w-10 h-10 rounded-lg object-cover" />
                   <span className="text-xl font-bold text-white">Collink</span>
                 </div>
               </Link>
