@@ -779,6 +779,72 @@ async def get_supported_states(exam: Optional[str] = Query("jee", description="E
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/colleges/branches")
+async def get_college_branches(exam: str = "jee", limit: int = 0):
+    """
+    Get all unique branches for a given exam.
+    """
+    try:
+        # Load cutoff data based on exam - prioritize new 1000 colleges data
+        cutoff_files = [
+            f"data/{exam}_1000_cutoffs.json",  # New 1000 colleges data
+            f"data/{exam}_cutoffs.json"        # Fallback to existing data
+        ]
+        
+        branches = set()
+        for cutoff_file in cutoff_files:
+            data_path = Path(cutoff_file)
+            if data_path.exists():
+                try:
+                    with open(data_path, 'r', encoding='utf-8') as f:
+                        file_data = json.load(f)
+                        for cutoff in file_data:
+                            branches.add(cutoff.get("branch"))
+                except Exception as e:
+                    print(f"Error loading {cutoff_file}: {e}")
+        
+        return {"branches": sorted(list(branches))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/colleges/by-branch")
+async def get_colleges_by_branch(
+    branch: str,
+    rank: int,
+    limit: int = 200,
+    category: str = "General",
+    exam: str = "jee"
+):
+    """
+    Get colleges for a given branch, filtered by rank.
+    """
+    try:
+        # Load cutoff data based on exam - prioritize new 1000 colleges data
+        cutoff_files = [
+            f"data/{exam}_1000_cutoffs.json",  # New 1000 colleges data
+            f"data/{exam}_cutoffs.json"        # Fallback to existing data
+        ]
+        
+        colleges = []
+        for cutoff_file in cutoff_files:
+            data_path = Path(cutoff_file)
+            if data_path.exists():
+                try:
+                    with open(data_path, 'r', encoding='utf-8') as f:
+                        file_data = json.load(f)
+                        for cutoff in file_data:
+                            if cutoff.get("branch") == branch and cutoff.get("closing_rank") >= rank:
+                                colleges.append(cutoff)
+                except Exception as e:
+                    print(f"Error loading {cutoff_file}: {e}")
+        
+        # Sort by closing rank
+        colleges.sort(key=lambda x: x.get("closing_rank", 0))
+        
+        return {"colleges": colleges[:limit]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/colleges/by-state")
 async def get_colleges_by_state(
     state: str = Query(..., description="State name to filter by (case-insensitive)"),

@@ -19,7 +19,9 @@ def safe_print(message: str) -> None:
 
 class CollegePredictorOptimized:
     def __init__(self, load_essential_only=True):
-        self.data_path = Path("data")
+        # Get the directory of the current script
+        script_dir = Path(__file__).parent.parent
+        self.data_path = script_dir / "data"
         self.cutoff_data = {}
         self.data_loaded = {}
         self.load_essential_only = load_essential_only
@@ -261,21 +263,25 @@ class CollegePredictorOptimized:
                     break
                 add_cutoff(c)
 
-            # If not enough, relax constraints progressively
-            if len(predictions) < cap:
+            # If not enough, relax constraints progressively, but only if no strict matches were found
+            if not predictions and len(predictions) < cap:
                 # 1) Ignore category/quota, keep branch and state, sort by proximity
                 relaxed = sorted(all_cutoffs, key=lambda x: abs(x.get("closing_rank", 0) - rank))
                 for c in relaxed:
                     if len(predictions) >= cap:
                         break
-                    add_cutoff(c)
+                    # Only add if the user's rank is within a reasonable range of the closing rank
+                    if abs(c.get("closing_rank", 0) - rank) < 20000:
+                        add_cutoff(c)
 
-            if len(predictions) < cap:
+            if not predictions and len(predictions) < cap:
                 # 2) Fill remaining with any entries (broadest), stable order
                 for c in all_cutoffs:
                     if len(predictions) >= cap:
                         break
-                    add_cutoff(c)
+                    # Only add if the user's rank is within a reasonable range of the closing rank
+                    if abs(c.get("closing_rank", 0) - rank) < 50000:
+                        add_cutoff(c)
             
             return predictions
             
@@ -299,18 +305,25 @@ class CollegePredictorOptimized:
             if quota != "All India" and cutoff_quota != quota:
                 return False
             
-            # More flexible category matching - allow cross-category if user rank is good enough
+            # More flexible category matching - allow cross-category eligibility
             cutoff_category = cutoff.get("category", "General")
-            # Allow any category if user has a very good rank, otherwise prefer same category
-            if category != cutoff_category and rank > 10000:
-                # For higher ranks, be more strict about category matching
-                category_hierarchy = {"General": 1, "EWS": 2, "OBC": 3, "SC": 4, "ST": 5}
-                user_level = category_hierarchy.get(category, 1)
-                cutoff_level = category_hierarchy.get(cutoff_category, 1)
-                if user_level < cutoff_level:  # User can apply to more relaxed categories
-                    pass  # Allow
-                else:
-                    return False
+            
+            # Category hierarchy: General is most competitive, ST is least competitive
+            category_hierarchy = {"General": 1, "EWS": 2, "OBC": 3, "SC": 4, "ST": 5}
+            user_level = category_hierarchy.get(category, 1)
+            cutoff_level = category_hierarchy.get(cutoff_category, 1)
+            
+            # Users can apply to their own category or more competitive categories
+            # For example: OBC students can apply to General seats if their rank is good enough
+            # But General category students cannot apply to reserved seats
+            if user_level > cutoff_level:
+                # User is from reserved category trying to apply to more competitive category
+                # This is allowed - reserved category students can compete in general category
+                pass
+            elif user_level < cutoff_level:
+                # General category student trying to apply to reserved seats - not allowed
+                return False
+            # If user_level == cutoff_level, it's the same category - allowed
             
             # Rank eligibility check - handle both old and new data formats
             closing_rank = cutoff.get("closing_rank", 0)
