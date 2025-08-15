@@ -326,201 +326,234 @@ const CollegePredictor = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-lg text-gray-600">Loading comprehensive college database...</p>
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-14 w-14 border-4 border-white/40 border-t-white mx-auto"></div>
+          <p className="mt-4 text-lg">Loading comprehensive college database...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header - Careers360 Style */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <GraduationCap className="h-12 w-12 text-blue-600 mr-3" />
-            <h1 className="text-4xl font-bold text-gray-800">Collink College Predictor</h1>
+    <div className="min-h-screen bg-[#f8fafc]">
+      {/* Navigation */}
+      <nav className="gradient-bg text-white shadow-lg">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <div className="rounded-lg bg-white/10 w-8 h-8 flex items-center justify-center">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold">Collink</span>
           </div>
-          <p className="text-lg text-gray-600 mb-2">Complete database with {allColleges.length.toLocaleString()} colleges from PDF + Careers360</p>
-          <div className="flex justify-center space-x-6 text-sm text-gray-500">
-            <span>🎯 JEE Main: 2000+ Colleges</span>
-            <span>🏆 JEE Advanced: 2000+ Programs</span>
-            <span>🏥 NEET: 2000+ Medical Colleges</span>
+          <div className="hidden md:flex space-x-6">
+            <a href="#predict" className="hover:text-blue-200 transition">Predictor</a>
+            <a href="#results" className="hover:text-blue-200 transition">Results</a>
           </div>
-        </div>
-
-        {/* Input Form - Careers360 Style */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Your Rank</label>
-              <input
-                type="number"
-                value={userRank}
-                onChange={(e) => setUserRank(parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your rank"
-                min="1"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Exam Type</label>
-              <select
-                value={examType}
-                onChange={(e) => setExamType(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="JEE Main">JEE Main</option>
-                <option value="JEE Advanced">JEE Advanced</option>
-                <option value="NEET">NEET</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="General">General</option>
-                <option value="OBC">OBC</option>
-                <option value="SC">SC</option>
-                <option value="ST">ST</option>
-                <option value="EWS">EWS</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search College</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Search by name..."
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
-              <select
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="All">All States</option>
-                {states.map(state => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">College Type</label>
-              <select
-                value={selectedCollegeType}
-                onChange={(e) => setSelectedCollegeType(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="All">All Types</option>
-                <option value="IIT">IIT</option>
-                <option value="NIT">NIT</option>
-                <option value="IIIT">IIIT</option>
-                <option value="AIIMS">AIIMS</option>
-                <option value="Government">Government</option>
-                <option value="Private">Private</option>
-                <option value="Deemed">Deemed</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            onClick={handlePredict}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center"
-          >
-            <TrendingUp className="h-5 w-5 mr-2" />
-            Predict Colleges
+          <button className="md:hidden text-white focus:outline-none" aria-label="menu">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
           </button>
         </div>
+      </nav>
 
-        {/* Results Section - Careers360 Style */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <Target className="h-6 w-6 text-red-500 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-800">
-                Eligible Colleges ({filteredColleges.length})
-              </h2>
-            </div>
-            <div className="text-sm text-gray-500">
-              Showing results for rank {userRank.toLocaleString()} in {examType} ({category})
+      {/* Hero Section */}
+      <section className="gradient-bg text-white py-12">
+        <div className="container mx-auto px-4 hero-content flex justify-between items-center">
+          <div className="w-full md:w-2/3 mb-8 md:mb-0">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Smart College Predictions</h1>
+            <p className="text-lg md:text-xl mb-6">Discover your best-fit colleges based on JEE Main/Advanced or NEET ranks using our comprehensive database.</p>
+            <div className="flex space-x-4">
+              <a href="#predict" className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-lg hover:bg-blue-100 transition">Try Predictor</a>
+              <a href="#results" className="border-2 border-white text-white font-semibold px-6 py-3 rounded-lg hover:bg-white hover:text-blue-600 transition">View Results</a>
             </div>
           </div>
-
-          {filteredColleges.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No colleges found for rank {userRank.toLocaleString()}.</h3>
-              <p className="text-gray-500">Try a higher rank or different category. Our database covers ranks up to 200,000!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredColleges.map((college, index) => {
-                let cutoff = 0;
-                if (examType === 'JEE Main') cutoff = college.cutoff_jee_main;
-                else if (examType === 'JEE Advanced') cutoff = college.cutoff_jee_advanced;
-                else if (examType === 'NEET') cutoff = college.cutoff_neet;
-
-                return (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 flex-1">{college.name}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        college.type === 'IIT' ? 'bg-yellow-100 text-yellow-800' :
-                        college.type === 'NIT' ? 'bg-green-100 text-green-800' :
-                        college.type === 'AIIMS' ? 'bg-red-100 text-red-800' :
-                        college.type === 'Government' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {college.type}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Cutoff Rank:</span> {cutoff?.toLocaleString() || 'N/A'}
-                      </div>
-                      <div>
-                        <span className="font-medium">State:</span> {college.state}
-                      </div>
-                      <div>
-                        <span className="font-medium">Fees:</span> {college.fees}
-                      </div>
-                      <div>
-                        <span className="font-medium">Seats:</span> {college.seats}
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-gray-500">
-                      Source: {college.source} | Exam: {college.exam_type}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
-      </div>
+      </section>
+
+      {/* Predictor Section */}
+      <section id="predict" className="py-12 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">College Predictor</h2>
+
+          <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden prediction-section">
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
+                  <select
+                    value={examType}
+                    onChange={(e) => setExamType(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="JEE Main">JEE Main</option>
+                    <option value="JEE Advanced">JEE Advanced</option>
+                    <option value="NEET">NEET</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your Rank</label>
+                  <input
+                    type="number"
+                    value={userRank}
+                    onChange={(e) => setUserRank(parseInt(e.target.value) || 0)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your rank"
+                    min={1}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {['General','OBC','SC','ST','EWS'].map((opt) => (
+                    <div key={opt}>
+                      <input id={`cat-${opt}`} type="radio" name="category"
+                        checked={category === opt}
+                        onChange={() => setCategory(opt)}
+                        className="hidden peer" />
+                      <label htmlFor={`cat-${opt}`} className="block px-4 py-2 text-center border border-gray-300 rounded-lg peer-checked:bg-blue-100 peer-checked:border-blue-500 cursor-pointer">
+                        {opt}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search College</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Search by name..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <select
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="All">All States</option>
+                    {states.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">College Type</label>
+                  <select
+                    value={selectedCollegeType}
+                    onChange={(e) => setSelectedCollegeType(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="IIT">IIT</option>
+                    <option value="NIT">NIT</option>
+                    <option value="IIIT">IIIT</option>
+                    <option value="AIIMS">AIIMS</option>
+                    <option value="Government">Government</option>
+                    <option value="Private">Private</option>
+                    <option value="Deemed">Deemed</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handlePredict}
+                className="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90 transition flex items-center justify-center"
+              >
+                <TrendingUp className="h-5 w-5 mr-2" />
+                Predict Colleges
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Results Section */}
+      <section id="results" className="py-12 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <Target className="h-6 w-6 text-blue-600 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-800">Predicted Colleges ({filteredColleges.length})</h2>
+              </div>
+              <div className="text-sm text-gray-500">
+                Rank {userRank.toLocaleString()} • {examType} • {category}
+              </div>
+            </div>
+
+            {filteredColleges.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">No colleges found for rank {userRank.toLocaleString()}.</h3>
+                <p className="text-gray-500">Try a higher rank or different category.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredColleges.map((college, index) => {
+                  let cutoff = 0;
+                  if (examType === 'JEE Main') cutoff = college.cutoff_jee_main;
+                  else if (examType === 'JEE Advanced') cutoff = college.cutoff_jee_advanced;
+                  else if (examType === 'NEET') cutoff = college.cutoff_neet;
+
+                  return (
+                    <div key={index} className="college-card bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition cursor-pointer">
+                      <div className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-lg font-semibold text-gray-800 flex-1">{college.name}</h3>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            college.type === 'IIT' ? 'bg-yellow-100 text-yellow-800' :
+                            college.type === 'NIT' ? 'bg-green-100 text-green-800' :
+                            college.type === 'AIIMS' ? 'bg-red-100 text-red-800' :
+                            college.type === 'Government' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {college.type}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                          <div><span className="font-medium">Cutoff:</span> {cutoff?.toLocaleString() || 'N/A'}</div>
+                          <div><span className="font-medium">State:</span> {college.state}</div>
+                          <div><span className="font-medium">Fees:</span> {college.fees}</div>
+                          <div><span className="font-medium">Seats:</span> {college.seats}</div>
+                        </div>
+
+                        <div className="mt-2 text-xs text-gray-500">Source: {college.source} • Exam: {college.exam_type}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="gradient-bg text-white py-8">
+        <div className="container mx-auto px-4 text-center">
+          <h3 className="text-lg font-semibold mb-2">College Predictor Pro</h3>
+          <p className="text-blue-100">Linking students with their ideal colleges through advanced data analytics.</p>
+          <div className="border-t border-blue-400 mt-8 pt-6 text-blue-100">
+            <p>© {new Date().getFullYear()} Collink. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

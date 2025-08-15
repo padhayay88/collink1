@@ -88,111 +88,69 @@ export default function CollegePredictor() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white p-6">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            🎯 Comprehensive College Predictor
-          </h1>
-          <p className="text-lg text-gray-600 mb-4">
-            Get accurate college predictions based on your rank from our comprehensive database
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">College Predictor</h1>
+          <p className="text-gray-600 mb-6 max-w-xl mx-auto">
+            Select your exam, enter your rank/score, and choose your category to predict eligible colleges.
           </p>
-          
-          {/* Database Stats */}
-          {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-6">
-              <div className="bg-white rounded-lg p-4 shadow-md">
-                <div className="flex items-center justify-center mb-2">
-                  <Database className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-                <div className="text-sm text-gray-600">Total Colleges</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-md">
-                <div className="flex items-center justify-center mb-2">
-                  <Globe className="h-6 w-6 text-green-600" />
-                </div>
-                <div className="text-2xl font-bold text-green-600">{Object.keys(stats.bySource).length}</div>
-                <div className="text-sm text-gray-600">Data Sources</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-md">
-                <div className="flex items-center justify-center mb-2">
-                  <MapPin className="h-6 w-6 text-purple-600" />
-                </div>
-                <div className="text-2xl font-bold text-purple-600">{Object.keys(stats.byState).length}</div>
-                <div className="text-sm text-gray-600">States Covered</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-md">
-                <div className="flex items-center justify-center mb-2">
-                  <GraduationCap className="h-6 w-6 text-orange-600" />
-                </div>
-                <div className="text-2xl font-bold text-orange-600">{Object.keys(stats.byType).length}</div>
-                <div className="text-sm text-gray-600">College Types</div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Input Form */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Your Rank
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Exam</label>
+              <select
+                value={examType}
+                onChange={(e) => setExamType(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="JEE Main">JEE Main/Advanced</option>
+                <option value="NEET">NEET</option>
+                <option value="IELTS">IELTS</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Your Rank/Score</label>
               <input
                 type="number"
                 value={userRank}
                 onChange={(e) => setUserRank(e.target.value)}
-                placeholder="Enter your rank"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your rank or score"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Exam Type
-              </label>
-              <select
-                value={examType}
-                onChange={(e) => setExamType(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="JEE Main">JEE Main</option>
-                <option value="JEE Advanced">JEE Advanced</option>
-                <option value="NEET">NEET</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="General">General</option>
-                <option value="OBC">OBC</option>
-                <option value="SC">SC</option>
-                <option value="ST">ST</option>
-                <option value="EWS">EWS</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                onClick={handlePredict}
-                disabled={loading || allColleges.length === 0}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <TrendingUp size={20} />
-                {loading ? 'Predicting...' : 'Predict Colleges'}
-              </button>
-            </div>
           </div>
+
+          {/* Category Buttons */}
+          <div className="flex space-x-4 mb-6">
+            {['General', 'OBC', 'SC', 'ST'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`flex-1 py-2 rounded-lg border text-center font-semibold transition-colors duration-200 ${
+                  category === cat
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handlePredict}
+            disabled={loading || allColleges.length === 0}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow duration-200 disabled:opacity-50"
+          >
+            {loading ? 'Predicting...' : 'Predict Colleges'}
+          </button>
+        </div>
 
           {/* Filters */}
           {!loading && filteredColleges.length > 0 && (
@@ -250,11 +208,9 @@ export default function CollegePredictor() {
 
         {/* Results */}
         {!loading && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">
-                🎯 Eligible Colleges ({filteredColleges.length})
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-800">Eligible Colleges ({filteredColleges.length})</h2>
               <div className="text-sm text-gray-600">
                 Showing results for rank {userRank} in {examType} ({category})
               </div>
@@ -270,7 +226,7 @@ export default function CollegePredictor() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredColleges.map((college: any, index: number) => {
                   let cutoff = 0;
                   if (examType === 'JEE Main') cutoff = college.cutoff_jee_main;
@@ -278,11 +234,11 @@ export default function CollegePredictor() {
                   else if (examType === 'NEET') cutoff = college.cutoff_neet;
 
                   return (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-lg font-semibold text-gray-800 flex-1">{college.name}</h3>
-                        <div className="flex flex-col gap-1 ml-2">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    <div key={index} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow bg-white college-card">
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-base font-semibold text-gray-900 flex-1">{college.name}</h3>
+                        <div className="flex flex-col gap-1 ml-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                             college.type === 'IIT' ? 'bg-yellow-100 text-yellow-800' :
                             college.type === 'NIT' ? 'bg-green-100 text-green-800' :
                             college.type === 'AIIMS' ? 'bg-red-100 text-red-800' :
@@ -291,13 +247,13 @@ export default function CollegePredictor() {
                           }`}>
                             {college.type}
                           </span>
-                          <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded text-center">
+                          <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded text-center">
                             {college.source}
                           </span>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                      <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
                         <div>
                           <span className="font-medium">Cutoff Rank:</span> {cutoff?.toLocaleString() || 'N/A'}
                         </div>
@@ -312,7 +268,7 @@ export default function CollegePredictor() {
                         </div>
                       </div>
                       
-                      <div className="mt-2 text-xs text-gray-500">
+                      <div className="mt-2 text-[11px] text-gray-500">
                         Source: {college.source} | Exam: {college.exam_type}
                       </div>
                     </div>

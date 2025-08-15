@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup  # type: ignore
 PDF_PATH = Path("Consolidated list of All Universities.pdf")
 CSV_PATH = Path("universities_list.csv")
 JEE_JSON_PATH = Path("data") / "jee_massive_colleges.json"
+NEET_JSON_PATH = Path("data") / "neet_massive_colleges.json"
 CAREERS360_ENGINEERING_BASE = "https://engineering.careers360.com/colleges/list-of-engineering-colleges-in-india"
 MAX_RANK_CAP = 200_000
 
@@ -113,6 +114,76 @@ def fetch_all_engineering(max_pages: int = 500) -> List[Dict[str, str]]:
             seen.add(k)
             uniq.append(r)
     print(f"✅ Careers360 engineering list: {len(uniq)} unique colleges")
+    return uniq
+
+
+def fetch_collegedunia_neet_colleges(max_pages: int = 50) -> List[Dict[str, str]]:
+    """Fetch NEET colleges from Collegedunia.
+
+    Strategy:
+      1) Try to extract college anchors from predictor landing page
+         https://collegedunia.com/neet-college-predictor (may have some static links)
+      2) Fallback to MBBS college listings: https://collegedunia.com/medical/mbbs-colleges
+         and iterate paginated results for broader coverage.
+    Returns list of {name, state} (state best-effort; may be empty).
+    """
+    headers = {"User-Agent": "Mozilla/5.0"}
+    results: List[Dict[str, str]] = []
+
+    def add_name(n: str, state: str = ""):
+        n = n.strip()
+        if len(n) < 3:
+            return
+        if not any(k in n.lower() for k in ["college", "institute", "medical", "aiims", "jipmer", "hospital"]):
+            return
+        results.append({"name": n, "state": state})
+
+    # 1) Predictor landing page (best-effort)
+    try:
+        url = "https://collegedunia.com/neet-college-predictor"
+        r = requests.get(url, timeout=20, headers=headers)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, "html.parser")
+            for a in soup.find_all("a"):
+                text = a.get_text(strip=True)
+                add_name(text)
+    except Exception:
+        pass
+
+    # 2) MBBS colleges listing with pagination
+    try:
+        base = "https://collegedunia.com/medical/mbbs-colleges"
+        for p in range(1, max_pages + 1):
+            page_url = base + (f"?page={p}" if p > 1 else "")
+            try:
+                resp = requests.get(page_url, timeout=20, headers=headers)
+                if resp.status_code != 200:
+                    break
+                soup = BeautifulSoup(resp.text, "html.parser")
+                cards = soup.select("a[href*='/college/'], a.cd__clg__name, a.cd__card__image")
+                found = 0
+                for a in cards:
+                    name = a.get_text(strip=True)
+                    if name:
+                        add_name(name)
+                        found += 1
+                # Heuristic: stop if page returns very few new items
+                if found < 5:
+                    break
+            except Exception:
+                break
+    except Exception:
+        pass
+
+    # Deduplicate while preserving order
+    seen: Set[str] = set()
+    uniq: List[Dict[str, str]] = []
+    for r in results:
+        k = normalize_name(r["name"])
+        if k not in seen:
+            seen.add(k)
+            uniq.append(r)
+    print(f"✅ Collegedunia NEET colleges discovered: {len(uniq)}")
     return uniq
 
 
@@ -219,6 +290,67 @@ def ensure_in_jee_dataset(jee_path: Path, names_states: List[Dict[str, str]], ma
     return appended, replaced
 
 
+def ensure_in_neet_dataset(neet_path: Path, names_states: List[Dict[str, str]], max_rank_cap: int = MAX_RANK_CAP) -> Tuple[int, int]:
+    if not neet_path.exists():
+        print(f"❌ NEET dataset not found: {neet_path}")
+        return 0, 0
+    with open(neet_path, "r", encoding="utf-8") as f:
+        neet = json.load(f)
+
+    existing_norm = set(normalize_name(item.get("name", "")) for item in neet)
+    current_max_rank = max((int(item.get("rank", 0)) for item in neet), default=0)
+
+    missing = [r for r in names_states if normalize_name(r["name"]) not in existing_norm]
+
+    appended = 0
+    replaced = 0
+
+    for r in list(missing):
+        if current_max_rank < max_rank_cap:
+            current_max_rank += 1
+            neet.append({
+                "name": r["name"],
+                "type": "Medical College",
+                "state": r.get("state", "Unknown") or "Unknown",
+                "rank": current_max_rank,
+                "category": "neet",
+                "source": "Collegedunia"
+            })
+            existing_norm.add(normalize_name(r["name"]))
+            appended += 1
+        else:
+            break
+
+    remaining_missing = [r for r in names_states if normalize_name(r["name"]) not in existing_norm]
+    if remaining_missing:
+        replace_indices = []
+        for idx in range(len(neet) - 1, -1, -1):
+            src = str(neet[idx].get("source", ""))
+            if src in ("CSV/PDF", ""):
+                replace_indices.append(idx)
+            if len(replace_indices) >= len(remaining_missing):
+                break
+        while len(replace_indices) < len(remaining_missing) and len(replace_indices) < len(neet):
+            replace_indices.append(len(neet) - 1 - len(replace_indices))
+
+        for r, idx in zip(remaining_missing, replace_indices):
+            rank_num = int(neet[idx].get("rank", max_rank_cap))
+            neet[idx] = {
+                "name": r["name"],
+                "type": "Medical College",
+                "state": r.get("state", "Unknown") or "Unknown",
+                "rank": rank_num,
+                "category": "neet",
+                "source": "Collegedunia"
+            }
+            replaced += 1
+
+    with open(neet_path, "w", encoding="utf-8") as f:
+        json.dump(neet, f, ensure_ascii=False, indent=2)
+
+    return appended, replaced
+
+
 def main():
     print("🚀 Updating universities and JEE dataset from PDF + Careers360 → CSV → JSON")
 
@@ -234,10 +366,18 @@ def main():
     # 3) Ensure all Careers360 engineering colleges are present in JEE dataset (append or replace tail)
     appended, replaced = ensure_in_jee_dataset(JEE_JSON_PATH, rows_c360, max_rank_cap=MAX_RANK_CAP)
 
+    # 4) Collegedunia → NEET dataset (append or replace tail)
+    print("\n🌐 Fetching NEET colleges from Collegedunia...")
+    rows_cd_neet = fetch_collegedunia_neet_colleges()
+    added_csv_cd = merge_into_csv(CSV_PATH, [r["name"] for r in rows_cd_neet])
+    appended_neet, replaced_neet = ensure_in_neet_dataset(NEET_JSON_PATH, rows_cd_neet, max_rank_cap=MAX_RANK_CAP)
+
     print(f"\nSummary:")
     print(f"  +{added_csv_pdf} from PDF into CSV")
     print(f"  +{added_csv_c360} from Careers360 into CSV")
+    print(f"  +{added_csv_cd} from Collegedunia into CSV")
     print(f"  +{appended} appended to JEE, {replaced} replaced (cap {MAX_RANK_CAP})")
+    print(f"  +{appended_neet} appended to NEET, {replaced_neet} replaced (cap {MAX_RANK_CAP})")
 
 
 if __name__ == "__main__":

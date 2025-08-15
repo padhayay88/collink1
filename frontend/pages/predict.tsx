@@ -9,6 +9,9 @@ import { PredictionResponse } from '../lib/api'
 import SaveCompareBar from '../components/SaveCompareBar'
 import BranchBrowser from '../components/BranchBrowser'
 import dynamic from 'next/dynamic'
+import CollegeSearch from '../components/CollegeSearch'
+import CollegeOverview from '../components/CollegeOverview'
+
 const CollegesAside = dynamic(() => import('../components/CollegesAside'), { ssr: false })
 
 export default function Predict() {
@@ -187,6 +190,12 @@ export default function Predict() {
               </p>
             </div>
           </motion.div>
+
+          {/* College Search and Overview */}
+          <div className="mt-16">
+            <CollegeSearch onSearch={(term) => { /* Implement search handler if needed */ }} />
+            <CollegeOverview selectedCollege={null} />
+          </div>
           </div>
         </div>
         <SaveCompareBar userId="local-user" />
@@ -194,4 +203,4 @@ export default function Predict() {
       </div>
     </>
   )
-} 
+}

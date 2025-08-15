@@ -86,3 +86,22 @@ a {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
+
+/* Collink custom helpers for new style */
+.gradient-bg {
+  background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+}
+
+.college-card {
+  transition: all 0.2s ease;
+}
+
+.college-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 768px) {
+  .hero-content {
+    flex-direction: column;
+  }
+}
