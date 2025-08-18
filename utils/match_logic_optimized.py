@@ -36,7 +36,8 @@ class CollegePredictorOptimized:
         essential_files = {
             "jee": ["jee_massive_cutoffs.json", "jee_comprehensive_cutoffs.json", "jee_10000_cutoffs.json"],
             "neet": ["neet_massive_cutoffs.json", "neet_comprehensive_cutoffs.json", "neet_10000_cutoffs.json"], 
-            "ielts": ["ielts_massive_cutoffs.json", "ielts_10000_cutoffs.json"]
+            "ielts": ["ielts_massive_cutoffs.json", "ielts_10000_cutoffs.json"],
+            "cat": ["cat_mba_colleges_from_pdf.json"]
         }
         
         for exam, filenames in essential_files.items():
@@ -213,7 +214,9 @@ class CollegePredictorOptimized:
         tolerance_percent: float = 0.0,
         states: Optional[List[str]] = None,
         load_full_data: bool = False,
-        limit: int = 300
+        limit: int = 300,
+        per_college_limit: int = 1,
+        ownership: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Predict colleges based on exam rank and category
@@ -226,6 +229,40 @@ class CollegePredictorOptimized:
             if exam not in self.cutoff_data:
                 return []
             
+            # Normalize ownership filter
+            own = (ownership or "").strip().lower()
+            if own in ("any", ""):
+                own = ""
+
+            def ownership_ok(c: Dict[str, Any]) -> bool:
+                if not own:
+                    return True
+                # Try common fields that may encode ownership
+                raw = (
+                    c.get("ownership")
+                    or c.get("ownership_type")
+                    or c.get("college_type")
+                    or c.get("type")
+                    or c.get("management")
+                    or c.get("institute_type")
+                    or ""
+                )
+                val = str(raw).strip().lower()
+                if not val:
+                    return False  # if user asked ownership, skip unknowns
+                # Government synonyms
+                gov_tokens = ["government", "govt", "public", "central", "state", "national"]
+                # Private synonyms
+                prv_tokens = ["private", "self", "deemed", "trust"]
+                is_gov = any(t in val for t in gov_tokens)
+                is_prv = any(t in val for t in prv_tokens) and not is_gov
+                if own.startswith("gov") or own == "government" or own == "public":
+                    return is_gov
+                if own.startswith("priv"):
+                    return is_prv
+                # If an unrecognized ownership string is provided, do not filter out
+                return True
+
             # Filter cutoffs based on strict criteria first
             def state_ok(c):
                 if not states:
@@ -234,7 +271,18 @@ class CollegePredictorOptimized:
                 cutoff_state = loc.split(",")[-1].strip() if "," in loc else loc
                 return cutoff_state in states if cutoff_state else False
 
-            all_cutoffs = [c for c in self.cutoff_data[exam] if state_ok(c)]
+            # Keep a copy without state filter for later broad fallback
+            all_cutoffs_no_state = [c for c in self.cutoff_data[exam] if ownership_ok(c)]
+            all_cutoffs = [c for c in self.cutoff_data[exam] if state_ok(c) and ownership_ok(c)]
+
+            # If coverage looks thin, auto-load full data once to boost matches
+            if not load_full_data and len(all_cutoffs) < 1000:
+                try:
+                    self.load_full_data(exam)
+                    all_cutoffs_no_state = [c for c in self.cutoff_data[exam] if ownership_ok(c)]
+                    all_cutoffs = [c for c in self.cutoff_data[exam] if state_ok(c) and ownership_ok(c)]
+                except Exception:
+                    pass
 
             strict_matches: List[Dict[str, Any]] = []
             for cutoff in all_cutoffs:
@@ -248,14 +296,24 @@ class CollegePredictorOptimized:
             predictions: List[Dict[str, Any]] = []
             seen_keys = set()
             cap = max(1, min(limit, 10000))
+            # Track how many entries we have per college to diversify results
+            per_college_limit = max(1, int(per_college_limit))
+            per_college_counts: Dict[str, int] = {}
 
             def add_cutoff(c):
                 # Less aggressive deduplication - allow different branches and categories
                 k = (c.get("college", "").lower(), c.get("branch", "").lower())
                 if k in seen_keys:
                     return False
+                college_key = c.get("college", "").strip().lower()
+                if college_key:
+                    count = per_college_counts.get(college_key, 0)
+                    if count >= per_college_limit:
+                        return False
                 predictions.append(self._create_prediction(c, rank, exam))
                 seen_keys.add(k)
+                if college_key:
+                    per_college_counts[college_key] = per_college_counts.get(college_key, 0) + 1
                 return True
 
             for c in strict_matches:
@@ -263,24 +321,64 @@ class CollegePredictorOptimized:
                     break
                 add_cutoff(c)
 
-            # If not enough, relax constraints progressively, but only if no strict matches were found
-            if not predictions and len(predictions) < cap:
+            # If not enough, relax constraints progressively. For NEET, use wider proximity windows
+            if len(predictions) < cap:
+                # Proximity windows (adaptive)
+                near_window = 20000
+                far_window = 80000
+                very_far_window = 120000
+                ex = exam.lower()
+                # NEET needs wider windows; support ranks up to 200k+
+                if ex == "neet":
+                    near_window = 60000 if rank >= 100000 else 50000
+                    far_window = 140000 if rank >= 100000 else 120000
+                    very_far_window = 250000
+                else:  # JEE and others
+                    if rank >= 100000:
+                        near_window = 50000
+                        far_window = 120000
+                        very_far_window = 200000
+
                 # 1) Ignore category/quota, keep branch and state, sort by proximity
                 relaxed = sorted(all_cutoffs, key=lambda x: abs(x.get("closing_rank", 0) - rank))
                 for c in relaxed:
                     if len(predictions) >= cap:
                         break
                     # Only add if the user's rank is within a reasonable range of the closing rank
-                    if abs(c.get("closing_rank", 0) - rank) < 20000:
+                    if abs(c.get("closing_rank", 0) - rank) < near_window:
                         add_cutoff(c)
 
-            if not predictions and len(predictions) < cap:
-                # 2) Fill remaining with any entries (broadest), stable order
-                for c in all_cutoffs:
+            if len(predictions) < cap:
+                # 2) Expand to far window within current state filter
+                for c in relaxed:
                     if len(predictions) >= cap:
                         break
-                    # Only add if the user's rank is within a reasonable range of the closing rank
-                    if abs(c.get("closing_rank", 0) - rank) < 50000:
+                    if abs(c.get("closing_rank", 0) - rank) < far_window:
+                        add_cutoff(c)
+
+            if len(predictions) < cap and states:
+                # 3) If state was restricting, try without state filter using proximity
+                relaxed_ns = sorted(all_cutoffs_no_state, key=lambda x: abs(x.get("closing_rank", 0) - rank))
+                for c in relaxed_ns:
+                    if len(predictions) >= cap:
+                        break
+                    if abs(c.get("closing_rank", 0) - rank) < near_window:
+                        add_cutoff(c)
+                if len(predictions) < cap:
+                    for c in relaxed_ns:
+                        if len(predictions) >= cap:
+                            break
+                        if abs(c.get("closing_rank", 0) - rank) < far_window:
+                            add_cutoff(c)
+
+            if len(predictions) < cap:
+                # 4) Very broad final fill to ensure enough options
+                # Prefer proximity order from all data
+                relaxed_all = sorted(all_cutoffs_no_state, key=lambda x: abs(x.get("closing_rank", 0) - rank))
+                for c in relaxed_all:
+                    if len(predictions) >= cap:
+                        break
+                    if abs(c.get("closing_rank", 0) - rank) < very_far_window:
                         add_cutoff(c)
             
             return predictions
@@ -381,6 +479,7 @@ class CollegePredictorOptimized:
                 "location": cutoff.get("location", "Unknown"),
                 "category": cutoff.get("category", "General"),
                 "quota": cutoff.get("quota", "All India"),
+                "ownership": cutoff.get("ownership") or cutoff.get("ownership_type") or cutoff.get("college_type") or cutoff.get("type") or cutoff.get("management") or cutoff.get("institute_type"),
                 "last_updated": cutoff.get("last_updated", datetime.now().isoformat())
             }
         except Exception as e:
