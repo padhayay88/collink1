@@ -1,0 +1,123 @@
+[
+  {
+    "college": "All India Institute of Medical Sciences, New Delhi",
+    "branch": "MBBS",
+    "opening_rank": 1,
+    "closing_rank": 51,
+    "category": "General",
+    "quota": "All India",
+    "location": "New Delhi, Delhi",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Christian Medical College, Vellore",
+    "branch": "MBBS",
+    "opening_rank": 52,
+    "closing_rank": 100,
+    "category": "General",
+    "quota": "All India",
+    "location": "Vellore, Tamil Nadu",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Maulana Azad Medical College, New Delhi",
+    "branch": "MBBS",
+    "opening_rank": 101,
+    "closing_rank": 200,
+    "category": "General",
+    "quota": "All India",
+    "location": "New Delhi, Delhi",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Armed Forces Medical College, Pune",
+    "branch": "MBBS",
+    "opening_rank": 201,
+    "closing_rank": 500,
+    "category": "General",
+    "quota": "All India",
+    "location": "Pune, Maharashtra",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Grant Medical College, Mumbai",
+    "branch": "MBBS",
+    "opening_rank": 501,
+    "closing_rank": 1000,
+    "category": "OBC",
+    "quota": "All India",
+    "location": "Mumbai, Maharashtra",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Bangalore Medical College and Research Institute, Bangalore",
+    "branch": "MBBS",
+    "opening_rank": 1001,
+    "closing_rank": 2000,
+    "category": "SC",
+    "quota": "All India",
+    "location": "Bangalore, Karnataka",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Stanley Medical College, Chennai",
+    "branch": "MBBS",
+    "opening_rank": 2001,
+    "closing_rank": 5000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Chennai, Tamil Nadu",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Government Medical College, Kozhikode",
+    "branch": "MBBS",
+    "opening_rank": 5001,
+    "closing_rank": 10000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Kozhikode, Kerala",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Kasturba Medical College, Manipal",
+    "branch": "MBBS",
+    "opening_rank": 10001,
+    "closing_rank": 20000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Manipal, Karnataka",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Jawaharlal Institute of Postgraduate Medical Education and Research, Puducherry",
+    "branch": "MBBS",
+    "opening_rank": 20001,
+    "closing_rank": 40000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Puducherry, Puducherry",
+    "exam_type": "neet",
+    "year": 2023
+  },
+  {
+    "college": "Lady Hardinge Medical College, New Delhi",
+    "branch": "MBBS",
+    "opening_rank": 40001,
+    "closing_rank": 60000,
+    "category": "General",
+    "quota": "All India",
+    "location": "New Delhi, Delhi",
+    "exam_type": "neet",
+    "year": 2023
+  }
+]

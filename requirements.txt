@@ -11,3 +11,4 @@ torch==2.8.0+cpu ; platform_system=="Windows" --index-url https://download.pytor
 beautifulsoup4
 pandas
 PyMuPDF>=1.24.0
+pdfplumber

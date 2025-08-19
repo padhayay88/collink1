@@ -8,10 +8,11 @@ import toast from 'react-hot-toast'
 interface PredictionFormProps {
   onPrediction: (data: any) => void
   isLoading: boolean
-  onPreferencesChange?: (prefs: { states: string[]; scope: 'all-india' | 'by-state'; budget?: number }) => void
+  onPreferencesChange?: (prefs: { states: string[]; scope: 'all-india' | 'by-state'; budget?: number; ownership?: 'any' | 'government' | 'private' }) => void
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export default function PredictionForm({ onPrediction, isLoading, onPreferencesChange }: PredictionFormProps) {
+export default function PredictionForm({ onPrediction, isLoading, onPreferencesChange, onLoadingChange }: PredictionFormProps) {
   const [formData, setFormData] = useState({
     exam: 'jee',
     rank: '',
@@ -21,12 +22,13 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
     tolerance_percent: 0,
     states: [] as string[],
     scope: 'all-india' as 'all-india' | 'by-state',
+    ownership: 'any' as 'any' | 'government' | 'private',
     budget: 0 as number,
     jeeType: 'advanced' as 'advanced' | 'mains'
   })
   const emitPrefs = (next?: Partial<typeof formData>) => {
     const curr = { ...formData, ...(next || {}) }
-    onPreferencesChange?.({ states: curr.states, scope: curr.scope, budget: curr.budget || 0 })
+    onPreferencesChange?.({ states: curr.states, scope: curr.scope, budget: curr.budget || 0, ownership: curr.ownership })
   }
 
   const [stateOptions, setStateOptions] = useState<string[]>([])
@@ -49,7 +51,7 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
     { id: 'jee', name: 'JEE Exam', icon: Calculator, description: 'Choose between JEE Main and JEE Advanced' },
     { id: 'neet', name: 'NEET UG', icon: Users, description: 'National Eligibility cum Entrance Test' },
     { id: 'ielts', name: 'IELTS', icon: Globe, description: 'International English Language Testing System' },
-    { id: 'combined', name: 'Multi-Exam', icon: Layers, description: 'Get predictions across JEE, NEET & IELTS' }
+    { id: 'cat', name: 'MBA (CAT)', icon: Layers, description: 'Find MBA colleges by CAT percentile' }
   ]
 
   const categories = ['General', 'OBC-NCL', 'SC', 'ST', 'EWS']
@@ -907,7 +909,8 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
       return
     }
 
-    if (parseFloat(formData.rank) <= 0) {
+    // Exam-specific basic validation
+    if ((formData.exam === 'jee' || formData.exam === 'neet') && parseFloat(formData.rank) <= 0) {
       toast.error('Please enter a valid positive number')
       return
     }
@@ -917,8 +920,14 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
       toast.error('IELTS score must be between 0 and 9')
       return
     }
+    // Validate CAT percentile range
+    if (formData.exam === 'cat' && (parseFloat(formData.rank) < 0 || parseFloat(formData.rank) > 100)) {
+      toast.error('CAT percentile must be between 0 and 100')
+      return
+    }
 
     setLoading(true)
+    onLoadingChange?.(true)
 
     try {
       // For IELTS, we expect a score instead of rank
@@ -930,13 +939,41 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
         quota: formData.quota,
         tolerance_percent: Number(formData.tolerance_percent) || 0,
         states: formData.scope === 'by-state' ? formData.states : undefined,
+        ownership: formData.ownership !== 'any' ? formData.ownership : undefined,
         load_full_data: false,  // Use essential data for faster response
-        limit: 200  // Reduced from 10000 for faster loading
+        limit: 300,  // reasonable cap
+        per_college_limit: 1
       }
 
       let predictionData
       try {
-        if (formData.exam === 'combined') {
+        if (formData.exam === 'cat') {
+          // CAT percentile flow (Option A): use NIRF-based CSV endpoint
+          const percentileVal = parseFloat(formData.rank)
+          const data = await api.getMBAByNIRFPercentile({ percentile: percentileVal, limit: 200 })
+          const mapped = {
+            exam: 'cat',
+            rank: percentileVal, // percentile
+            predictions: (data.colleges || []).map((c: any) => ({
+              college: c.name,
+              branch: 'MBA',
+              opening_rank: null,
+              closing_rank: null,
+              category: null,
+              quota: null,
+              location: c.location ?? null,
+              nirf_rank: c.nirf_rank ?? null,
+              nirf_score: c.nirf_score ?? null,
+              nirf_percentile: c.nirf_percentile ?? null,
+              exam_type: 'cat',
+              year: null
+            })),
+            total_colleges: data.total || 0,
+            source: data.source
+          }
+          predictionData = mapped
+          toast.success('CAT MBA colleges (NIRF) loaded!')
+        } else if (formData.exam === 'combined') {
           // Use combined endpoint for multi-exam predictions
           const combinedPayload = {
             exams: ['jee', 'neet', 'ielts'],
@@ -946,7 +983,8 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
             quota: formData.quota,
             tolerance_percent: Number(formData.tolerance_percent) || 0,
             states: formData.scope === 'by-state' ? formData.states : undefined,
-            limit: 200
+            ownership: formData.ownership !== 'any' ? formData.ownership : undefined,
+            limit: 300
           }
           const response = await axios.post('http://localhost:8000/api/v1/predict/combined', combinedPayload)
           predictionData = response.data
@@ -960,10 +998,14 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
         }
       } catch (apiError) {
         // If API fails, use mock data
-        console.log('API not available, using mock data')
-        predictionData = generateMockPredictions(payload)
-        predictionData.total_colleges = predictionData.predictions?.length || 0
-        toast.success('Predictions generated successfully!')
+        console.log('API not available, using fallback')
+        if (formData.exam === 'cat') {
+          predictionData = { exam: 'cat', rank: parseFloat(formData.rank), predictions: [], total_colleges: 0 }
+          toast.error('CAT endpoint unavailable. Showing no results.')
+        } else {
+          predictionData = generateMockPredictions(payload)
+          toast.success('Showing mock predictions')
+        }
       }
       
       onPrediction(predictionData)
@@ -1103,6 +1145,28 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
                   )}
                 </div>
                 <p className="mt-1 text-xs text-gray-500">If no state is selected, All India is used.</p>
+
+                {/* Ownership filter */}
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-1">Ownership</label>
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-sm font-medium ${formData.ownership === 'any' ? 'bg-blue-50 text-blue-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                      onClick={() => { const next = { ...formData, ownership: 'any' as const }; setFormData(next); emitPrefs(next) }}
+                    >Any</button>
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-sm font-medium border-l border-gray-200 ${formData.ownership === 'government' ? 'bg-blue-50 text-blue-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                      onClick={() => { const next = { ...formData, ownership: 'government' as const }; setFormData(next); emitPrefs(next) }}
+                    >Government</button>
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-sm font-medium border-l border-gray-200 ${formData.ownership === 'private' ? 'bg-blue-50 text-blue-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                      onClick={() => { const next = { ...formData, ownership: 'private' as const }; setFormData(next); emitPrefs(next) }}
+                    >Private</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1131,62 +1195,72 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
           </div>
         )}
 
-        {/* Rank Input */}
-        <div>
-          <label htmlFor="rank" className="block text-sm font-medium text-gray-700 mb-2">
-            {formData.exam === 'ielts' 
-              ? 'IELTS Score' 
-              : formData.exam === 'jee' && formData.jeeType === 'advanced' 
-                ? 'Your JEE Advanced Rank' 
-                : formData.exam === 'jee' && formData.jeeType === 'mains' 
-                  ? 'Your JEE Main Rank' 
-                  : 'Your Rank'}
-          </label>
-          <div className="relative">
-            <TrendingUp className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="number"
-              id="rank"
-              value={formData.rank}
-              onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
-              placeholder={formData.exam === 'ielts' 
-                ? 'e.g., 7.5' 
-                : formData.exam === 'jee' && formData.jeeType === 'mains' 
-                  ? 'e.g., 150000 (AIR)' 
-                  : formData.exam === 'jee' && formData.jeeType === 'advanced' 
-                    ? 'e.g., 5000' 
-                    : 'e.g., 1500'}
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-              min={formData.exam === 'ielts' ? '0' : '1'}
-              max={formData.exam === 'ielts' 
-                ? '9' 
-                : (formData.exam === 'jee' 
-                    ? (formData.jeeType === 'advanced' ? '200000' : '1200000') 
-                    : formData.exam === 'neet' 
-                      ? '1000000' 
-                      : undefined)}
-              step={formData.exam === 'ielts' ? '0.1' : '1'}
-            />
-            <button
-              type="button"
-              onClick={pasteFromClipboard}
-              title="Paste from clipboard"
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-            >
-              <ClipboardPaste className="w-4 h-4" />
-            </button>
+        {/* Rank Input (hidden for BA) */}
+        {formData.exam !== 'ba' && (
+          <div>
+            <label htmlFor="rank" className="block text-sm font-medium text-gray-700 mb-2">
+              {formData.exam === 'ielts' 
+                ? 'Your IELTS Score' 
+                : formData.exam === 'cat'
+                  ? 'Your CAT Percentile'
+                  : formData.exam === 'jee' && formData.jeeType === 'mains' 
+                    ? 'Your JEE Main All India Rank' 
+                    : formData.exam === 'jee' && formData.jeeType === 'advanced' 
+                      ? 'Your JEE Advanced rank'
+                      : 'Your rank'}
+            </label>
+            <div className="relative">
+              <TrendingUp className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="number"
+                id="rank"
+                value={formData.rank}
+                onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
+                placeholder={formData.exam === 'ielts' 
+                  ? 'e.g., 7.5' 
+                  : formData.exam === 'cat'
+                    ? 'e.g., 95.5'
+                    : formData.exam === 'jee' && formData.jeeType === 'mains' 
+                      ? 'e.g., 150000 (AIR)' 
+                      : formData.exam === 'jee' && formData.jeeType === 'advanced' 
+                        ? 'e.g., 5000' 
+                        : 'e.g., 1500'}
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+                min={formData.exam === 'ielts' ? '0' : (formData.exam === 'cat' ? '0' : '1')}
+                max={formData.exam === 'ielts' 
+                  ? '9' 
+                  : formData.exam === 'cat'
+                    ? '100'
+                    : (formData.exam === 'jee' 
+                        ? (formData.jeeType === 'advanced' ? '200000' : '1200000') 
+                        : formData.exam === 'neet' 
+                          ? '200000' 
+                          : undefined)}
+                step={formData.exam === 'ielts' || formData.exam === 'cat' ? '0.1' : '1'}
+              />
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                title="Paste from clipboard"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <ClipboardPaste className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              {formData.exam === 'ielts' 
+                ? 'Enter your overall IELTS score (0-9)'
+                : formData.exam === 'cat'
+                  ? 'Enter your CAT percentile (0-100)'
+                  : formData.exam === 'jee' && formData.jeeType === 'mains'
+                    ? 'Enter your JEE Main All India Rank'
+                    : formData.exam === 'jee' && formData.jeeType === 'advanced'
+                      ? 'Enter your JEE Advanced rank'
+                      : 'Enter your rank'}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            {formData.exam === 'ielts' 
-              ? 'Enter your overall IELTS score (0-9)'
-              : formData.exam === 'jee' && formData.jeeType === 'mains'
-                ? 'Enter your JEE Main All India Rank'
-                : formData.exam === 'jee' && formData.jeeType === 'advanced'
-                  ? 'Enter your JEE Advanced rank'
-                  : 'Enter your exam rank (All India Rank)'}
-          </p>
-        </div>
+        )}
 
         {/* Category */}
         {formData.exam !== 'ielts' && (
@@ -1310,7 +1384,7 @@ export default function PredictionForm({ onPrediction, isLoading, onPreferencesC
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
               <Calendar className="w-6 h-6 text-blue-600" />
             </div>
-            <div className="text-sm font-medium text-gray-900">Updated 2023</div>
+            <div className="text-sm font-medium text-gray-900">Updated 2024</div>
             <div className="text-xs text-gray-600">Latest cutoff data</div>
           </div>
         </div>

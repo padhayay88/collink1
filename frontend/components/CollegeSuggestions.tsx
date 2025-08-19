@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'react-hot-toast'
+
 import { CheckCircle, AlertTriangle, XCircle, MapPin, TrendingUp, ExternalLink, GraduationCap, BarChart2, Save, Bell, Heart, Share2, Copy, Eye, Globe, BookOpen, UserCheck, FileText, ChevronDown, ChevronUp, Info, Star, Bookmark, Award, Home, Building2, Phone, MessageCircle, IndianRupee, Gift, Loader2 } from 'lucide-react'
 import TrendChart from './TrendChart'
 import api, { Prediction } from '../lib/api'
@@ -11,14 +13,56 @@ interface CollegeSuggestionsProps {
   exam: string
   rank: number
   category: string
+  enableCompare?: boolean
 }
 
-export default function CollegeSuggestions({ predictions, exam, rank, category }: CollegeSuggestionsProps) {
+export default function CollegeSuggestions({ predictions, exam, rank, category, enableCompare = true }: CollegeSuggestionsProps) {
   const [displayLimit, setDisplayLimit] = useState(20) // Start with fewer items
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadingRef = useRef<HTMLDivElement>(null)
+  const [selectedCompare, setSelectedCompare] = useState<Set<string>>(new Set())
+  const pageScrollRef = useRef<number>(0)
+  const highRef = useRef<HTMLDivElement>(null)
+  const medRef = useRef<HTMLDivElement>(null)
+  const lowRef = useRef<HTMLDivElement>(null)
+  const [highStart, setHighStart] = useState(0)
+  const [medStart, setMedStart] = useState(0)
+  const [lowStart, setLowStart] = useState(0)
+
+  const APPROX_ROW = 220 // px, approximate card height including gap
+  const WINDOW_COUNT = 30 // how many items to render per section
+  const BUFFER = 6
+
+  // Persist compare selections in localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('compare.selection')
+      if (saved) {
+        const arr: string[] = JSON.parse(saved)
+        setSelectedCompare(new Set(arr))
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    try {
+      const arr = Array.from(selectedCompare)
+      localStorage.setItem('compare.selection', JSON.stringify(arr))
+    } catch {}
+  }, [selectedCompare])
+
+  const isSelected = useCallback((name: string) => selectedCompare.has(name), [selectedCompare])
+  const toggleSelected = useCallback((name: string) => {
+    setSelectedCompare(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }, [])
 
   const getConfidenceColor = (confidence?: string, level?: string) => {
     const val = (confidence || level || '').toLowerCase()
@@ -122,6 +166,29 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
     setIsLoading(false)
   }, [predictions])
 
+  // Lightweight virtualization: compute start index per section based on scroll
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY
+      pageScrollRef.current = y
+      const updateFor = (el: HTMLElement | null, total: number, setFn: (n: number) => void) => {
+        if (!el || total === 0) return
+        const rect = el.getBoundingClientRect()
+        const top = rect.top + window.scrollY
+        const rel = Math.max(0, y - top)
+        const idx = Math.floor(rel / APPROX_ROW)
+        const start = Math.max(0, Math.min(total - 1, idx - BUFFER))
+        setFn(start)
+      }
+      updateFor(highRef.current, displayedHigh.length, setHighStart)
+      updateFor(medRef.current, displayedMedium.length, setMedStart)
+      updateFor(lowRef.current, displayedLow.length, setLowStart)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [displayedHigh.length, displayedMedium.length, displayedLow.length])
+
   if (predictions.length === 0) {
     return (
       <motion.div
@@ -192,6 +259,7 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
+          ref={highRef}
         >
           <div className="flex items-center mb-6">
             <div className="w-3 h-8 bg-green-500 rounded-full mr-3"></div>
@@ -201,9 +269,39 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             </div>
           </div>
           <div className="grid gap-6">
-            {displayedHigh.map((prediction, index) => (
-              <CollegeCard key={`high-${index}`} prediction={prediction} exam={exam} />
-            ))}
+            <AnimatePresence initial={false}>
+              {(() => {
+                const start = highStart
+                const end = Math.min(displayedHigh.length, start + WINDOW_COUNT)
+                const topSpace = start * APPROX_ROW
+                const bottomSpace = Math.max(0, (displayedHigh.length - end) * APPROX_ROW)
+                const slice = displayedHigh.slice(start, end)
+                return (
+                  <>
+                    {topSpace > 0 && <div style={{ height: topSpace }} />}
+                    {slice.map((prediction, i) => (
+                      <motion.div
+                        key={`high-${start + i}`}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, delay: (start + i) * 0.035 }}
+                        layout
+                      >
+                        <CollegeCard 
+                          prediction={prediction} 
+                          exam={exam}
+                          compareEnabled={enableCompare}
+                          selectedForCompare={isSelected(prediction.college)}
+                          onToggleCompare={() => toggleSelected(prediction.college)}
+                        />
+                      </motion.div>
+                    ))}
+                    {bottomSpace > 0 && <div style={{ height: bottomSpace }} />}
+                  </>
+                )
+              })()}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
@@ -214,6 +312,7 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          ref={medRef}
         >
           <div className="flex items-center mb-6">
             <div className="w-3 h-8 bg-yellow-500 rounded-full mr-3"></div>
@@ -223,9 +322,33 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             </div>
           </div>
           <div className="grid gap-6">
-            {displayedMedium.map((prediction, index) => (
-              <CollegeCard key={`medium-${index}`} prediction={prediction} exam={exam} />
-            ))}
+            <AnimatePresence initial={false}>
+              {(() => {
+                const start = medStart
+                const end = Math.min(displayedMedium.length, start + WINDOW_COUNT)
+                const topSpace = start * APPROX_ROW
+                const bottomSpace = Math.max(0, (displayedMedium.length - end) * APPROX_ROW)
+                const slice = displayedMedium.slice(start, end)
+                return (
+                  <>
+                    {topSpace > 0 && <div style={{ height: topSpace }} />}
+                    {slice.map((prediction, i) => (
+                      <motion.div
+                        key={`medium-${start + i}`}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, delay: (start + i) * 0.035 }}
+                        layout
+                      >
+                        <CollegeCard prediction={prediction} exam={exam} />
+                      </motion.div>
+                    ))}
+                    {bottomSpace > 0 && <div style={{ height: bottomSpace }} />}
+                  </>
+                )
+              })()}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
@@ -236,6 +359,7 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          ref={lowRef}
         >
           <div className="flex items-center mb-6">
             <div className="w-3 h-8 bg-red-500 rounded-full mr-3"></div>
@@ -245,9 +369,33 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             </div>
           </div>
           <div className="grid gap-6">
-            {displayedLow.map((prediction, index) => (
-              <CollegeCard key={`low-${index}`} prediction={prediction} exam={exam} />
-            ))}
+            <AnimatePresence initial={false}>
+              {(() => {
+                const start = lowStart
+                const end = Math.min(displayedLow.length, start + WINDOW_COUNT)
+                const topSpace = start * APPROX_ROW
+                const bottomSpace = Math.max(0, (displayedLow.length - end) * APPROX_ROW)
+                const slice = displayedLow.slice(start, end)
+                return (
+                  <>
+                    {topSpace > 0 && <div style={{ height: topSpace }} />}
+                    {slice.map((prediction, i) => (
+                      <motion.div
+                        key={`low-${start + i}`}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, delay: (start + i) * 0.035 }}
+                        layout
+                      >
+                        <CollegeCard prediction={prediction} exam={exam} />
+                      </motion.div>
+                    ))}
+                    {bottomSpace > 0 && <div style={{ height: bottomSpace }} />}
+                  </>
+                )
+              })()}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
@@ -281,6 +429,81 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
             <p className="text-sm text-gray-500 mt-1">Use the filters above to refine your search</p>
           </div>
         </motion.div>
+      )}
+
+      {/* Compare Action Bar */}
+      {enableCompare && selectedCompare.size >= 1 && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
+          <div className="bg-white shadow-2xl rounded-full px-4 py-2 border border-gray-200 flex items-center gap-3">
+            <span className="text-sm text-gray-700">Selected: {selectedCompare.size}</span>
+            <button
+              className={`text-sm px-3 py-1.5 rounded-full ${selectedCompare.size >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+              disabled={selectedCompare.size < 2}
+              onClick={() => {
+                const names = Array.from(selectedCompare).slice(0, 4)
+                const q = encodeURIComponent(names.join(','))
+                const url = `/compare?colleges=${q}`
+                window.open(url, '_blank')
+                toast.success('Opened compare in a new tab')
+              }}
+            >
+              Compare
+            </button>
+            <button
+              className="text-sm px-3 py-1.5 rounded-full bg-purple-600 text-white"
+              onClick={async () => {
+                try {
+                  const uid = 'local-user'
+                  const names = Array.from(selectedCompare)
+                  for (const n of names) {
+                    await api.saveCollege(uid, n)
+                  }
+                  toast.success(`Saved ${names.length} colleges`)
+                  // update localStorage to persist and sync across tabs
+                  try {
+                    const cached = localStorage.getItem('saved.colleges')
+                    const list: string[] = cached ? JSON.parse(cached) : []
+                    const merged = Array.from(new Set([...list, ...names]))
+                    localStorage.setItem('saved.colleges', JSON.stringify(merged))
+                  } catch {}
+                } catch (e) {
+                  console.error('Save selected failed', e)
+                  toast.error('Failed to save some colleges')
+                }
+              }}
+            >
+              Save Selected
+            </button>
+            <button
+              className="text-sm px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200"
+              onClick={() => {
+                const id = toast.custom((t) => (
+                  <div className="bg-white border border-gray-200 shadow-lg rounded-lg p-3 flex items-center gap-3">
+                    <span className="text-sm text-gray-700">Clear all selections?</span>
+                    <button
+                      className="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                      onClick={() => toast.dismiss(t.id)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="text-sm px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                      onClick={() => {
+                        setSelectedCompare(new Set())
+                        toast.dismiss(t.id)
+                        toast.success('Cleared selections')
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ))
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Summary Card */}
@@ -320,10 +543,10 @@ export default function CollegeSuggestions({ predictions, exam, rank, category }
 }
 
 // Advanced Interactive College Card Component
-function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: string }) {
+function CollegeCard({ prediction, exam, compareEnabled, selectedForCompare, onToggleCompare }: { prediction: Prediction; exam: string; compareEnabled?: boolean; selectedForCompare?: boolean; onToggleCompare?: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isFavorited, setIsFavorited] = useState(false)
-  const [isComparing, setIsComparing] = useState(false)
+  const isComparing = !!selectedForCompare
   const [showShareMenu, setShowShareMenu] = useState(false)
   const [copied, setCopied] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -488,13 +711,6 @@ function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: strin
       icon: FileText,
       color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200'
     },
-    // Additional comprehensive links
-    nirf: {
-      name: 'NIRF Ranking',
-      url: `https://www.nirfindia.org/2023/EngineeringRanking.html`,
-      icon: Award,
-      color: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border-yellow-200'
-    },
     placement: {
       name: 'Placement Info',
       url: extendedPrediction.placement_link || `${extendedPrediction.website}/placement`,
@@ -579,8 +795,7 @@ function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: strin
   }
 
   const toggleCompare = () => {
-    setIsComparing(!isComparing)
-    // In a real app, this would add to a comparison state
+    if (onToggleCompare) onToggleCompare()
   }
 
   return (
@@ -657,18 +872,20 @@ function CollegeCard({ prediction, exam }: { prediction: Prediction; exam: strin
                 <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
               </motion.button>
               
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleCompare}
-                className={`p-2 rounded-full transition-all duration-200 ${
-                  isComparing 
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-                title={isComparing ? 'Remove from compare' : 'Add to compare'}
-              >
-                <BarChart2 className="w-4 h-4" />
-              </motion.button>
+              {compareEnabled && (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleCompare}
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    isComparing 
+                      ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  title={isComparing ? 'Remove from compare' : 'Add to compare'}
+                >
+                  <BarChart2 className="w-4 h-4" />
+                </motion.button>
+              )}
               
               <div className="relative">
                 <motion.button

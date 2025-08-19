@@ -118,7 +118,7 @@ const LoginPage = () => {
         <meta name="description" content="Sign in to your Collink account" />
       </Head>
       
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#e6ebf2] flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -131,9 +131,9 @@ const LoginPage = () => {
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2 }}
-              className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4"
+              className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-[#e6ebf2] shadow-[20px_20px_40px_#c5cbd5,-20px_-20px_40px_#ffffff]"
             >
-              <span className="text-white text-2xl font-bold">C</span>
+              <span className="text-gray-700 text-2xl font-bold">Login</span>
             </motion.div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
             <p className="text-gray-600">Sign in to your Collink account</p>
@@ -144,7 +144,7 @@ const LoginPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl shadow-xl p-8"
+            className="rounded-3xl p-8 bg-[#e6ebf2] shadow-[20px_20px_60px_#c5cbd5,-20px_-20px_60px_#ffffff]"
           >
             {/* Auth Method Toggle */}
             <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
@@ -190,7 +190,7 @@ const LoginPage = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#e6ebf2] border-0 shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-400"
                       placeholder="Enter your email"
                     />
                   </div>
@@ -207,7 +207,7 @@ const LoginPage = () => {
                         name="countryCode"
                         value={formData.countryCode}
                         onChange={handleInputChange}
-                        className="pl-8 pr-2 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        className="pl-8 pr-2 py-3 rounded-2xl bg-[#e6ebf2] border-0 shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-400"
                       >
                         {countryCodes.map((country) => (
                           <option key={country.code} value={country.code}>
@@ -223,7 +223,7 @@ const LoginPage = () => {
                       value={formData.phone}
                       onChange={handleInputChange}
                       required
-                      className="flex-1 pl-4 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="flex-1 pl-4 pr-4 py-3 rounded-2xl bg-[#e6ebf2] border-0 shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-400"
                       placeholder="Enter phone number"
                     />
                   </div>
@@ -244,7 +244,7 @@ const LoginPage = () => {
                     value={formData.password}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full pl-10 pr-12 py-3 rounded-2xl bg-[#e6ebf2] border-0 shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-400"
                     placeholder="Enter your password"
                   />
                   <button
@@ -281,11 +281,11 @@ const LoginPage = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 rounded-2xl font-medium text-gray-700 bg-[#e6ebf2] shadow-[20px_20px_40px_#c5cbd5,-20px_-20px_40px_#ffffff] hover:shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] active:shadow-[inset_6px_6px_12px_#c5cbd5,inset_-6px_-6px_12px_#ffffff] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-2"></div>
                     Signing In...
                   </div>
                 ) : (

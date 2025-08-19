@@ -19,6 +19,8 @@ import {
   ArrowRight,
   RefreshCw
 } from 'lucide-react'
+import api, { AIPicksResponse } from '../lib/api'
+import { AIDenseSkeleton } from './Skeletons'
 
 interface AIRecommendation {
   id: string
@@ -68,108 +70,75 @@ const AIRecommendations: React.FC<AIRecommendationsProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [analysisComplete, setAnalysisComplete] = useState(false)
   const [selectedInsight, setSelectedInsight] = useState<string | null>(null)
+  const [diagnose, setDiagnose] = useState<any | null>(null)
+  const [apiBase, setApiBase] = useState<string>('')
 
-  // Simulate AI recommendation generation
+  // Fetch AI recommendations from backend
   const generateRecommendations = async () => {
-    setIsLoading(true)
-    setAnalysisComplete(false)
+    try {
+      setIsLoading(true)
+      setAnalysisComplete(false)
+      setDiagnose(null)
+      setApiBase(api.getBaseUrl())
 
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 2000))
+      const states = userProfile?.preferences?.location || []
+      const exam = userProfile.exam?.toLowerCase() || 'jee'
+      const rankVal = typeof userProfile.rank === 'number' && userProfile.rank > 0 ? userProfile.rank : 150000
+      const resp: AIPicksResponse = await api.predictAI({
+        exam,
+        rank: rankVal,
+        category: 'General',
+        states,
+        limit: 20,
+        per_college_limit: 1
+      })
 
-    const mockRecommendations: AIRecommendation[] = [
-      {
-        id: '1',
-        college: 'Indian Institute of Technology, Delhi',
-        branch: 'Computer Science and Engineering',
-        confidence: 92,
-        matchReason: 'Perfect alignment with your rank, interests in AI/ML, and career aspirations in tech',
-        aiScore: 9.2,
-        personalizedInsights: [
-          'Your rank puts you in the top 1% of applicants for this program',
-          'Strong placement record in AI/ML companies (95% placement rate)',
-          'Excellent research opportunities matching your interests',
-          'Alumni network strength in your preferred career path'
-        ],
+      const mapped: AIRecommendation[] = (resp.picks || []).map((p, idx) => ({
+        id: String(idx + 1),
+        college: p.college,
+        branch: p.branch || '—',
+        confidence: p.confidence_level?.toLowerCase() === 'high' ? 90 : p.confidence_level?.toLowerCase() === 'medium' ? 75 : 60,
+        matchReason: (p.match_reasons && p.match_reasons.length) ? p.match_reasons[0] : 'Good alignment with your profile and preferences',
+        aiScore: Math.round((p.ai_score / 10) * 10) / 10, // keep 1 decimal
+        personalizedInsights: p.match_reasons?.slice(0, 4) || [],
         predictedOutcome: {
-          admissionChance: 85,
-          placementChance: 95,
-          salaryRange: [25, 45]
-        },
-        competitiveAnalysis: {
-          yourRank: userProfile.rank,
-          averageAdmittedRank: userProfile.rank + 500,
-          competition: 'High'
-        },
-        futureProspects: {
-          industryGrowth: 35,
-          jobAvailability: 'High',
-          skillAlignment: 88
-        }
-      },
-      {
-        id: '2',
-        college: 'National Institute of Technology, Karnataka',
-        branch: 'Electronics and Communication',
-        confidence: 78,
-        matchReason: 'Good fit based on your rank range and interest in hardware technologies',
-        aiScore: 8.1,
-        personalizedInsights: [
-          'Excellent faculty-to-student ratio for personalized attention',
-          'Strong industry connections in semiconductor sector',
-          'Growing demand for ECE professionals in your region',
-          'Balanced academic and extracurricular opportunities'
-        ],
-        predictedOutcome: {
-          admissionChance: 75,
-          placementChance: 88,
+          admissionChance: Math.min(98, Math.max(40, Math.round(p.ai_score))),
+          placementChance: 85,
           salaryRange: [18, 35]
         },
         competitiveAnalysis: {
-          yourRank: userProfile.rank,
-          averageAdmittedRank: userProfile.rank - 200,
-          competition: 'Medium'
+          yourRank: resp.rank,
+          averageAdmittedRank: p.closing_rank || resp.rank,
+          competition: p.confidence_level?.toLowerCase() === 'high' ? 'Medium' : 'High'
         },
         futureProspects: {
-          industryGrowth: 28,
+          industryGrowth: 25,
           jobAvailability: 'High',
-          skillAlignment: 75
+          skillAlignment: 80
         }
-      },
-      {
-        id: '3',
-        college: 'Birla Institute of Technology and Science, Pilani',
-        branch: 'Data Science and Engineering',
-        confidence: 85,
-        matchReason: 'Emerging field matching your AI/ML interests with excellent industry connections',
-        aiScore: 8.7,
-        personalizedInsights: [
-          'Cutting-edge curriculum aligned with industry 4.0 trends',
-          'Direct recruitment by top tech companies for DS roles',
-          'Flexible degree structure allowing interdisciplinary learning',
-          'Strong entrepreneurship ecosystem for startup opportunities'
-        ],
-        predictedOutcome: {
-          admissionChance: 80,
-          placementChance: 92,
-          salaryRange: [22, 40]
-        },
-        competitiveAnalysis: {
-          yourRank: userProfile.rank,
-          averageAdmittedRank: userProfile.rank + 100,
-          competition: 'Medium'
-        },
-        futureProspects: {
-          industryGrowth: 45,
-          jobAvailability: 'High',
-          skillAlignment: 92
-        }
-      }
-    ]
+      }))
 
-    setRecommendations(mockRecommendations)
-    setIsLoading(false)
-    setAnalysisComplete(true)
+      setRecommendations(mapped)
+      if (!mapped.length) {
+        try {
+          const diag = await api.aiPicksDiagnose({ exam, states, limit: 20 })
+          setDiagnose(diag)
+        } catch {}
+      }
+    } catch (e) {
+      console.error('Failed to load AI picks', e)
+      setRecommendations([])
+      try {
+        const exam = userProfile.exam?.toLowerCase() || 'jee'
+        const states = userProfile?.preferences?.location || []
+        const diag = await api.aiPicksDiagnose({ exam, states, limit: 20 })
+        setDiagnose(diag)
+        setApiBase(api.getBaseUrl())
+      } catch {}
+    } finally {
+      setIsLoading(false)
+      setAnalysisComplete(true)
+    }
   }
 
   useEffect(() => {
@@ -190,45 +159,23 @@ const AIRecommendations: React.FC<AIRecommendationsProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl shadow-lg border border-purple-100 p-8">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Brain className="w-8 h-8 text-white animate-pulse" />
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl shadow-lg border border-purple-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+              <Brain className="w-6 h-6 text-white animate-pulse" />
+            </div>
+            <div>
+              <div className="h-4 w-48 bg-white/60 rounded mb-1" />
+              <div className="h-3 w-32 bg-white/50 rounded" />
+            </div>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis in Progress</h3>
-          <p className="text-gray-600 mb-6">
-            Our AI is analyzing thousands of data points to find your perfect college matches...
-          </p>
-          <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="flex items-center"
-            >
-              <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
-              Analyzing academic profile
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
-              className="flex items-center"
-            >
-              <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
-              Matching preferences
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.5 }}
-              className="flex items-center"
-            >
-              <Clock className="w-4 h-4 text-yellow-500 mr-2 animate-spin" />
-              Generating recommendations
-            </motion.div>
+          <div className="text-xs text-gray-600 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-yellow-500 animate-spin" />
+            Analyzing...
           </div>
         </div>
+        <AIDenseSkeleton count={6} />
       </div>
     )
   }
@@ -261,6 +208,22 @@ const AIRecommendations: React.FC<AIRecommendationsProps> = ({
 
       {/* Recommendations */}
       <div className="space-y-6">
+        {analysisComplete && recommendations.length === 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg">
+            <div className="text-sm font-semibold mb-1">No AI picks received</div>
+            <div className="text-xs">API: {apiBase || 'unknown'}</div>
+            {diagnose && (
+              <div className="mt-2 text-xs">
+                <div>Diagnose exam: {diagnose.exam}</div>
+                <div>LLM providers: OpenAI={String(diagnose.llm_providers?.openai)} Google={String(diagnose.llm_providers?.google)}</div>
+                <div>Local sample count: {diagnose.local_sample_count}</div>
+                {Array.isArray(diagnose.local_sample) && diagnose.local_sample.length > 0 && (
+                  <div>Sample: {diagnose.local_sample.slice(0,3).join(', ')}</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {recommendations.map((rec, index) => (
           <motion.div
             key={rec.id}

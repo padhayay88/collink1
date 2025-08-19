@@ -14,19 +14,36 @@ export default function Home() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('/api/stats')
+        const res = await fetch('/api/v1/stats')
         if (res.ok) {
           const data = await res.json()
           setCounts({ neet: data.neet || 0, jee: data.jee || 0, pdf_universities: data.pdf_universities || 0, total: data.total || 0 })
+        } else {
+          // Fallback to local Next.js API route which returns dummy stats
+          try {
+            const resLocal = await fetch('/api/stats')
+            if (resLocal.ok) {
+              const dataLocal = await resLocal.json()
+              setCounts({ neet: dataLocal.neet || 0, jee: dataLocal.jee || 0, pdf_universities: dataLocal.pdf_universities || 0, total: dataLocal.total || 0 })
+            }
+          } catch {}
         }
       } catch (e) {
-        // silent fail; keep defaults
+        // Fallback if network error
+        try {
+          const resLocal = await fetch('/api/stats')
+          if (resLocal.ok) {
+            const dataLocal = await resLocal.json()
+            setCounts({ neet: dataLocal.neet || 0, jee: dataLocal.jee || 0, pdf_universities: dataLocal.pdf_universities || 0, total: dataLocal.total || 0 })
+          }
+        } catch {}
       } finally {
         setLoadingCounts(false)
       }
     }
     fetchStats()
   }, [])
+
   const features = [
     {
       icon: <GraduationCap className="w-8 h-8" />,
@@ -89,49 +106,27 @@ export default function Home() {
           <LanguageSwitcher />
         </div>
 
-        {/* Features Section */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Quote Section */}
+        <section className="py-8 md:py-12">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
+              transition={{ duration: 0.6 }}
+              className="bg-white/70 backdrop-blur rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8"
             >
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                Why Choose Collink?
-              </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                We provide comprehensive college prediction and search tools to help you make informed decisions about your future.
-              </p>
+              <blockquote className="text-center">
+                <p className="text-xl md:text-2xl font-semibold text-slate-900 leading-relaxed">
+                  “Right college. Right course. Right now — powered by real data, AI insights, and your ambitions.”
+                </p>
+                <footer className="mt-3 text-slate-600 text-sm">— Collink AI Recommendations</footer>
+              </blockquote>
             </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100"
-                >
-                  <div className={`w-16 h-16 bg-gradient-to-r ${feature.color} rounded-2xl flex items-center justify-center text-white mb-6`}>
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
           </div>
         </section>
 
-        {/* Stats Section */}
-        <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
+        {/* Features Section */}
+        <section className="py-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -139,12 +134,45 @@ export default function Home() {
               transition={{ duration: 0.8 }}
               className="text-center mb-12"
             >
-              <h2 className="text-4xl font-bold text-white mb-4">
-                Trusted by Students
+              <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3">
+                Why Choose Collink?
               </h2>
-              <p className="text-xl text-blue-100">
-                Our platform helps thousands of students find their perfect college match
+              <p className="text-base md:text-lg text-slate-600 max-w-3xl mx-auto">
+                We provide comprehensive college prediction and search tools to help you make informed decisions about your future.
               </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.06 }}
+                  className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-200"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700 mb-4">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-1">{feature.title}</h3>
+                  <p className="text-slate-600 text-sm leading-6">{feature.description}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Section */}
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-4xl font-bold text-gray-900 mb-4">Trusted by Students</h2>
+              <p className="text-xl text-gray-600">Our platform helps thousands of students find their perfect college match</p>
             </motion.div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -156,14 +184,78 @@ export default function Home() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   className="text-center"
                 >
-                  <div className="text-4xl md:text-5xl font-bold text-white mb-2">
+                  <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
                     {stat.number}
                   </div>
-                  <div className="text-blue-100 font-medium">
+                  <div className="text-gray-600 font-medium">
                     {stat.label}
                   </div>
                 </motion.div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Data Section with cards and side image */}
+        <section className="py-20 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+              {/* Left: content */}
+              <div>
+                <div className="text-center lg:text-left mb-10">
+                  <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3">Data</h2>
+                  <p className="text-slate-600 max-w-2xl">
+                    We simplify information for you on over {counts?.total ?? 0} colleges, multiple exams, and diverse courses across India.
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Rankings Card */}
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                        <BarChart2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Rankings</h3>
+                        <p className="text-sm text-slate-600 mt-1">Transparent and data-driven rankings to help you compare colleges.</p>
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <Link href="/colleges" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">Top Engineering</Link>
+                          <Link href="/colleges" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">Top MBA</Link>
+                          <Link href="/colleges" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">Top Medical</Link>
+                          <Link href="/colleges" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">Top Universities</Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Exams Card */}
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                        <GraduationCap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Exams</h3>
+                        <p className="text-sm text-slate-600 mt-1">Easy access to details and predictors for popular exams.</p>
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <Link href="/predict?exam=jee" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">JEE</Link>
+                          <Link href="/predict?exam=neet" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">NEET</Link>
+                          <Link href="/predict?exam=ielts" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">IELTS</Link>
+                          <Link href="/search" className="px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white hover:border-blue-300">Search All</Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: illustration image */}
+              <div className="relative">
+                <div className="mx-auto max-w-md lg:max-w-none">
+                  <img src="/data/image3.png" alt="Data Illustration" className="w-full h-auto rounded-xl shadow-md object-contain" />
+                </div>
+              </div>
             </div>
           </div>
         </section>

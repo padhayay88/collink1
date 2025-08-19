@@ -40,6 +40,51 @@ export interface PredictionRequest {
   tolerance_percent?: number
   states?: string[]
   load_full_data?: boolean
+  per_college_limit?: number
+  limit?: number
+  ownership?: 'Any' | 'Government' | 'Private' | string
+}
+
+// AI Picks
+export interface AIPicksRequest {
+  exam: string
+  rank: number
+  category?: string
+  gender?: string
+  quota?: string
+  tolerance_percent?: number
+  states?: string[]
+  load_full_data?: boolean
+  limit?: number
+  per_college_limit?: number
+  ownership?: 'Any' | 'Government' | 'Private' | string
+  budget?: number | null
+  interests?: string[] | null
+  goals?: string[] | null
+}
+
+export interface AIPick {
+  college: string
+  branch?: string
+  opening_rank?: number
+  closing_rank?: number
+  your_rank: number
+  confidence_level?: string
+  category?: string
+  quota?: string
+  location?: string
+  ai_score: number
+  match_reasons: string[]
+}
+
+export interface AIPicksResponse {
+  exam: string
+  rank: number
+  category: string
+  total: number
+  picks: AIPick[]
+  response_time: number
+  data_source: string
 }
 
 export interface CollegeInfo {
@@ -117,6 +162,10 @@ export interface TrendPoint {
 
 // API Functions
 export const api = {
+  // Introspection
+  getBaseUrl(): string {
+    return API_BASE_URL
+  },
   // Prediction APIs
   async predictColleges(request: PredictionRequest): Promise<PredictionResponse> {
     try {
@@ -127,8 +176,35 @@ export const api = {
     }
   },
 
+  // AI Picks (AI-ranked predictions)
+  async predictAI(request: AIPicksRequest): Promise<AIPicksResponse> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/predict/ai`, request)
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Failed to get AI picks')
+    }
+  },
+
+  // AI Picks Diagnose
+  async aiPicksDiagnose(params: { exam?: string; states?: string[]; limit?: number }): Promise<{ exam: string; states: string[]; limit: number; data_loaded: Record<string, any>; llm_providers: { openai: boolean; google: boolean }; local_sample_count: number; local_sample: string[] }>{
+    const { exam = 'neet', states = [], limit = 20 } = params || {}
+    try {
+      const response = await axios.get(`${API_BASE_URL}/predict/ai/diagnose`, {
+        params: {
+          exam,
+          states: states.join(',') || undefined,
+          limit,
+        },
+      })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Failed to diagnose AI picks')
+    }
+  },
+
   // Combined predictions (multi-exam)
-  async predictCombined(payload: { exams: string[]; rank: number; category?: string; gender?: string; quota?: string; tolerance_percent?: number; states?: string[]; limit?: number }): Promise<{ exams: string[]; rank: number; category: string; predictions: any[]; total: number }> {
+  async predictCombined(payload: { exams: string[]; rank: number; category?: string; gender?: string; quota?: string; tolerance_percent?: number; states?: string[]; limit?: number; ownership?: 'Any' | 'Government' | 'Private' | string }): Promise<{ exams: string[]; rank: number; category: string; predictions: any[]; total: number }> {
     try {
       const response = await axios.post(`${API_BASE_URL}/predict/combined`, payload)
       return response.data
@@ -356,6 +432,54 @@ export const api = {
       return response.data
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'AI chat failed')
+    }
+  },
+
+  // MBA (CAT) — fetch MBA colleges by CAT percentile using DB cutoffs
+  async getMBAByCATPercentile(params: { percentile: number; year?: number; states?: string[]; ownership?: 'government' | 'private'; include_no_rank?: boolean; tolerance_percent?: number; limit?: number; offset?: number }): Promise<{
+    exam: string;
+    percentile: number;
+    approx_rank: number;
+    tolerance_percent: number;
+    year?: number;
+    states?: string[];
+    ownership?: string;
+    include_no_rank: boolean;
+    total: number;
+    colleges: any[];
+    offset: number;
+  }> {
+    const { percentile, year, states, ownership, include_no_rank = true, tolerance_percent = 0, limit = 200, offset = 0 } = params
+    const q: any = { percentile, include_no_rank, tolerance_percent, limit, offset }
+    if (year != null) q.year = year
+    if (states && states.length) q.states = states.join(',')
+    if (ownership) q.ownership = ownership
+    try {
+      const response = await axios.get(`${API_BASE_URL}/db/mba/by-cat-percentile`, { params: q })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Failed to load MBA colleges for CAT percentile')
+    }
+  },
+
+  // MBA (NIRF) — fetch MBA colleges by NIRF-derived percentile from CSV
+  async getMBAByNIRFPercentile(params: { percentile: number; limit?: number; min_score?: number }): Promise<{
+    exam: string;
+    source: string;
+    percentile: number;
+    limit: number;
+    min_score?: number;
+    total: number;
+    colleges: Array<{ name: string; location?: string; nirf_rank?: number; nirf_score?: number; nirf_percentile: number }>;
+  }> {
+    const { percentile, limit = 200, min_score } = params
+    const q: any = { percentile, limit }
+    if (min_score != null) q.min_score = min_score
+    try {
+      const response = await axios.get(`${API_BASE_URL}/db/mba/nirf`, { params: q })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Failed to load MBA colleges by NIRF percentile')
     }
   }
 }

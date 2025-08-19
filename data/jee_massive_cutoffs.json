@@ -1,0 +1,112 @@
+[
+  {
+    "college": "Indian Institute of Technology Bombay",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 1,
+    "closing_rank": 66,
+    "category": "General",
+    "quota": "All India",
+    "location": "Mumbai, Maharashtra",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Indian Institute of Technology Delhi",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 67,
+    "closing_rank": 115,
+    "category": "General",
+    "quota": "All India",
+    "location": "New Delhi, Delhi",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "National Institute of Technology, Tiruchirappalli",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 4000,
+    "closing_rank": 8000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Tiruchirappalli, Tamil Nadu",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "National Institute of Technology, Warangal",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 8001,
+    "closing_rank": 15000,
+    "category": "OBC",
+    "quota": "All India",
+    "location": "Warangal, Telangana",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Indian Institute of Information Technology, Allahabad",
+    "branch": "Information Technology",
+    "opening_rank": 15001,
+    "closing_rank": 30000,
+    "category": "SC",
+    "quota": "All India",
+    "location": "Allahabad, Uttar Pradesh",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Punjab Engineering College, Chandigarh",
+    "branch": "Electronics and Communication Engineering",
+    "opening_rank": 30001,
+    "closing_rank": 50000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Chandigarh, Chandigarh",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Thapar Institute of Engineering and Technology, Patiala",
+    "branch": "Mechanical Engineering",
+    "opening_rank": 50001,
+    "closing_rank": 70000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Patiala, Punjab",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Pandit Deendayal Energy University (PDEU)",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 40000,
+    "closing_rank": 60000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Gandhinagar, Gujarat",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "Manipal Institute of Technology, Manipal",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 50000,
+    "closing_rank": 80000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Manipal, Karnataka",
+    "exam_type": "jee",
+    "year": 2023
+  },
+  {
+    "college": "VIT Vellore",
+    "branch": "Computer Science and Engineering",
+    "opening_rank": 60000,
+    "closing_rank": 90000,
+    "category": "General",
+    "quota": "All India",
+    "location": "Vellore, Tamil Nadu",
+    "exam_type": "jee",
+    "year": 2023
+  }
+]

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Phone, Mail, User, Lock, Globe, ArrowRight, Key, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Phone, Mail, User, Lock, Globe, ArrowRight } from 'lucide-react';
 import Head from 'next/head';
 import { useAuth } from '../lib/auth';
 import { useRouter } from 'next/router';
 import { GoogleLogin } from '@react-oauth/google';
-import { auth } from '../lib/supabase';
 
 const RegisterPage = () => {
   const { login } = useAuth();
@@ -25,9 +24,6 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
-  const [showAuthCode, setShowAuthCode] = useState(false);
-  const [authCode, setAuthCode] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
 
   const countryCodes = [
     { code: '+977', country: 'Nepal', flag: '🇳🇵' },
@@ -119,104 +115,27 @@ const RegisterPage = () => {
         return;
       }
 
-      // Try Supabase registration first, fallback to local if it fails
-      console.log('Attempting Supabase registration...');
+      // Registration logic would go here
+      console.log('Registration data:', formData);
       
-      try {
-        // Check if Supabase is configured
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          throw new Error('Supabase configuration missing');
-        }
-        
-        console.log('Attempting Supabase signup with:', {
-          email: formData.email,
-          hasPassword: !!formData.password,
-          fullName: formData.fullName
-        });
-        
-        const { data, error } = await auth.signUp(formData.email, formData.password, {
-          data: {
-            full_name: formData.fullName,
-            phone: formData.phone
-          }
-        });
-        
-        console.log('Supabase signup response:', { data, error });
-        
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-
-        if (data.user && !data.user.email_confirmed_at) {
-          // Email confirmation required
-          setEmailSent(true);
-          setShowAuthCode(true);
-          alert('Registration successful! Please check your email for a confirmation link. You can also enter the authentication code below to verify your account.');
-        } else {
-          // Registration successful (email already confirmed)
-          const userData = {
-            id: data.user?.id || Date.now().toString(),
-            name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone || undefined,
-          };
-          
-          login(userData);
-          alert('Registration successful! Welcome to Collink!');
-          router.push('/');
-        }
-      } catch (supabaseError) {
-        console.log('Supabase failed, using local fallback:', supabaseError.message);
-        
-        // Fallback to local registration
-        const userData = {
-          id: Date.now().toString(),
-          name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone || undefined,
-        };
-        
-        setEmailSent(true);
-        setShowAuthCode(true);
-        alert('Registration successful! (Local mode) Please enter the authentication code below.');
-      }
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Create user object and log in
+      const userData = {
+        id: Date.now().toString(),
+        name: formData.fullName,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+      };
+      
+      login(userData);
+      alert('Registration successful!');
+      router.push('/');
       
     } catch (error) {
       console.error('Registration error:', error);
       alert('Registration failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAuthCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // Here you would typically verify the auth code with Supabase
-      // For now, we'll simulate the verification
-      if (authCode.length === 6) {
-        // Simulate verification
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const userData = {
-          id: Date.now().toString(),
-          name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone || undefined,
-        };
-        
-        login(userData);
-        alert('Email verified successfully! Welcome to Collink!');
-        router.push('/');
-      } else {
-        alert('Please enter a valid 6-digit authentication code');
-      }
-    } catch (error) {
-      console.error('Auth code verification error:', error);
-      alert('Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -456,64 +375,6 @@ const RegisterPage = () => {
                 )}
               </button>
             </form>
-
-            {/* Authentication Code Section */}
-            {showAuthCode && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                transition={{ duration: 0.3 }}
-                className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200"
-              >
-                {emailSent && (
-                  <div className="flex items-center mb-4 text-blue-700">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    <span className="text-sm font-medium">Verification email sent to {formData.email}</span>
-                  </div>
-                )}
-                
-                <form onSubmit={handleAuthCodeSubmit} className="space-y-4">
-                  <div>
-                    <label htmlFor="authCode" className="block text-sm font-medium text-gray-700 mb-2">
-                      Authentication Code
-                    </label>
-                    <div className="relative">
-                      <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        id="authCode"
-                        value={authCode}
-                        onChange={(e) => setAuthCode(e.target.value)}
-                        maxLength={6}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-center text-lg font-mono"
-                        placeholder="Enter 6-digit code"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Enter the 6-digit code sent to your email or click the link in your email
-                    </p>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    disabled={isLoading || authCode.length !== 6}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Verifying...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        Verify Email
-                        <CheckCircle className="ml-2 w-5 h-5" />
-                      </div>
-                    )}
-                  </button>
-                </form>
-              </motion.div>
-            )}
 
             {/* Divider */}
             <div className="relative my-6">

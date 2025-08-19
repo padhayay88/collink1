@@ -1,26 +1,57 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Header from '../components/Header'
 import PredictionForm from '../components/PredictionForm'
 import CollegeSuggestions from '../components/CollegeSuggestions'
 import AIRecommendations from '../components/AIRecommendations'
 import { motion } from 'framer-motion'
-import { PredictionResponse } from '../lib/api'
+import api, { PredictionResponse } from '../lib/api'
 import SaveCompareBar from '../components/SaveCompareBar'
 import BranchBrowser from '../components/BranchBrowser'
 import dynamic from 'next/dynamic'
+import CollegeSearch from '../components/CollegeSearch'
+import CollegeOverview from '../components/CollegeOverview'
+import { ListSkeleton, SummarySkeleton } from '../components/Skeletons'
+
 const CollegesAside = dynamic(() => import('../components/CollegesAside'), { ssr: false })
 
 export default function Predict() {
   const [predictionData, setPredictionData] = useState<PredictionResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'traditional' | 'ai'>('traditional')
-  const [prefs, setPrefs] = useState<{ states: string[]; scope: 'all-india' | 'by-state'; budget?: number }>({ states: [], scope: 'all-india', budget: 0 })
+  const [prefs, setPrefs] = useState<{ states: string[]; scope: 'all-india' | 'by-state'; budget?: number; ownership?: 'any' | 'government' | 'private' }>({ states: [], scope: 'all-india', budget: 0, ownership: 'any' })
+  const [stateSummaries, setStateSummaries] = useState<Array<{ state: string; counts: { government: number; private: number; unknown: number }; total: number }>>([])
+  const [stateSummariesLoading, setStateSummariesLoading] = useState(false)
 
   const handlePrediction = (data: PredictionResponse) => {
     setPredictionData(data)
     setActiveTab('traditional')
   }
+
+  // Load per-state ownership summaries when predictions + selected states present
+  useEffect(() => {
+    const loadSummaries = async () => {
+      if (!predictionData) { setStateSummaries([]); return }
+      if (prefs.scope !== 'by-state' || !prefs.states || prefs.states.length === 0) { setStateSummaries([]); return }
+      try {
+        setStateSummariesLoading(true)
+        const ownership = (prefs.ownership && prefs.ownership !== 'any') ? prefs.ownership : undefined
+        const exam = predictionData.exam || 'jee'
+        const results = await Promise.all(
+          prefs.states.map(async (state) => {
+            const data = await api.getCollegesByState({ state, ownership, exam, limit: 200 })
+            return { state, counts: data.counts, total: data.total }
+          })
+        )
+        setStateSummaries(results)
+      } catch (e) {
+        setStateSummaries([])
+      } finally {
+        setStateSummariesLoading(false)
+      }
+    }
+    loadSummaries()
+  }, [predictionData, prefs.scope, JSON.stringify(prefs.states), prefs.ownership])
 
   return (
     <>
@@ -64,42 +95,47 @@ export default function Predict() {
                   onPrediction={handlePrediction}
                   isLoading={isLoading}
                   onPreferencesChange={(p) => setPrefs(p)}
+                  onLoadingChange={(l) => setIsLoading(l)}
                 />
               </div>
 
-              {/* Welcome Message */}
-              <div className="max-w-lg mx-auto lg:mx-0">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-2xl shadow-xl p-8 text-center"
-                >
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                    Get Your Predictions
-                  </h3>
-                  <p className="text-gray-600 mb-8 text-sm leading-relaxed">
-                    Fill out the form on the left to see college predictions based on your rank.
-                  </p>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span>High Confidence</span>
+              {/* Welcome or Loading */}
+              <div className="max-w-lg mx-auto lg:mx-0 w-full">
+                {isLoading ? (
+                  <ListSkeleton count={6} />
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl shadow-xl p-8 text-center"
+                  >
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                     </div>
-                    <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <span>Medium Confidence</span>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                      Get Your Predictions
+                    </h3>
+                    <p className="text-gray-600 mb-8 text-sm leading-relaxed">
+                      Fill out the form on the left to see college predictions based on your rank.
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>High Confidence</span>
+                      </div>
+                      <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <span>Medium Confidence</span>
+                      </div>
+                      <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span>Low Confidence</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-center space-x-3 text-sm text-gray-600">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span>Low Confidence</span>
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                )}
               </div>
             </div>
           ) : (
@@ -109,6 +145,8 @@ export default function Predict() {
                 <PredictionForm 
                   onPrediction={handlePrediction}
                   isLoading={isLoading}
+                  onPreferencesChange={(p) => setPrefs(prev => ({ ...prev, ...p }))}
+                  onLoadingChange={(l) => setIsLoading(l)}
                 />
               </div>
 
@@ -135,12 +173,41 @@ export default function Predict() {
                   {/* Branches first */}
                   <BranchBrowser rank={predictionData.rank} exam={predictionData.exam} />
                   {/* Then colleges list */}
-                  <CollegeSuggestions
-                    predictions={predictionData.predictions}
-                    exam={predictionData.exam || 'jee'}
-                    rank={predictionData.rank}
-                    category={predictionData.category}
-                  />
+                  {isLoading ? (
+                    <ListSkeleton count={8} />
+                  ) : (
+                    <CollegeSuggestions
+                      predictions={predictionData.predictions}
+                      exam={predictionData.exam || 'jee'}
+                      rank={predictionData.rank}
+                      category={predictionData.category}
+                    />
+                  )}
+
+                  {/* Per-state summary (if user chose states) */}
+                  {prefs.scope === 'by-state' && prefs.states && prefs.states.length > 0 && (
+                    <div className="mt-10 bg-white rounded-2xl shadow-xl p-6">
+                      <h3 className="text-xl font-bold text-gray-900 mb-4">State Summary</h3>
+                      <p className="text-sm text-gray-600 mb-4">Ownership filter: {(prefs.ownership || 'any')}</p>
+                      {stateSummariesLoading ? (
+                        <SummarySkeleton boxes={prefs.states.length || 6} />
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {stateSummaries.map((s) => (
+                            <div key={s.state} className="border rounded-xl p-4">
+                              <div className="font-semibold text-gray-900 mb-1">{s.state}</div>
+                              <div className="text-sm text-gray-600 mb-2">Total: {s.total}</div>
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="inline-flex items-center gap-1 text-green-700"><span className="w-2 h-2 bg-green-500 rounded-full"></span>Govt: {s.counts.government}</span>
+                                <span className="inline-flex items-center gap-1 text-purple-700"><span className="w-2 h-2 bg-purple-500 rounded-full"></span>Private: {s.counts.private}</span>
+                                <span className="inline-flex items-center gap-1 text-gray-600"><span className="w-2 h-2 bg-gray-400 rounded-full"></span>Unknown: {s.counts.unknown}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="mt-4">
@@ -181,12 +248,18 @@ export default function Predict() {
             </div>
             
             <div className="bg-white rounded-2xl p-6 shadow-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Updated 2023</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Updated 2024</h3>
               <p className="text-gray-600 text-sm">
-                We use the latest 2023 cutoff data to ensure the most accurate and up-to-date predictions.
+                We use the latest 2024 cutoff data to ensure the most accurate and up-to-date predictions.
               </p>
             </div>
           </motion.div>
+
+          {/* College Search and Overview */}
+          <div className="mt-16">
+            <CollegeSearch onSearch={(term) => { /* Implement search handler if needed */ }} />
+            <CollegeOverview selectedCollege={null} />
+          </div>
           </div>
         </div>
         <SaveCompareBar userId="local-user" />
@@ -194,4 +267,4 @@ export default function Predict() {
       </div>
     </>
   )
-} 
+}

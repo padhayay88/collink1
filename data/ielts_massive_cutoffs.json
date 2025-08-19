@@ -1,0 +1,57 @@
+[
+  {
+    "college": "University of Oxford",
+    "branch": "Computer Science",
+    "min_score": 7.5,
+    "max_score": 9.0,
+    "category": "General",
+    "quota": "International",
+    "location": "Oxford, UK",
+    "exam_type": "ielts",
+    "year": 2023
+  },
+  {
+    "college": "University of Cambridge",
+    "branch": "Computer Science",
+    "min_score": 7.5,
+    "max_score": 9.0,
+    "category": "General",
+    "quota": "International",
+    "location": "Cambridge, UK",
+    "exam_type": "ielts",
+    "year": 2023
+  },
+  {
+    "college": "Harvard University",
+    "branch": "Computer Science",
+    "min_score": 7.5,
+    "max_score": 9.0,
+    "category": "General",
+    "quota": "International",
+    "location": "Cambridge, USA",
+    "exam_type": "ielts",
+    "year": 2023
+  },
+  {
+    "college": "Stanford University",
+    "branch": "Computer Science",
+    "min_score": 7.0,
+    "max_score": 9.0,
+    "category": "General",
+    "quota": "International",
+    "location": "Stanford, USA",
+    "exam_type": "ielts",
+    "year": 2023
+  },
+  {
+    "college": "Massachusetts Institute of Technology (MIT)",
+    "branch": "Computer Science",
+    "min_score": 7.0,
+    "max_score": 9.0,
+    "category": "General",
+    "quota": "International",
+    "location": "Cambridge, USA",
+    "exam_type": "ielts",
+    "year": 2023
+  }
+]
